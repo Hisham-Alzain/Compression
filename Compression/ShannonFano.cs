@@ -1,27 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-
-namespace Compression
+﻿namespace Compression
 {
     public class ShannonFano
     {
+        private Helper helper;
         private const int BUFFER_SIZE = 4096; // For handling large files
         public ShannonFano()
         {
+            helper = new Helper();
         }
 
         public void Compress(string inputFile, string outputFile)
         {
             byte[] data = File.ReadAllBytes(inputFile);
-            Dictionary<byte, int> frequencies = CalculateFrequencies(data);
-            List<Symbol> symbols = CreateSymbol(frequencies);
+            Dictionary<byte, int> frequencies = helper.CalculateFrequencies(data);
+            List<Node> symbols = CreateSymbol(frequencies);
 
             BuildShannonFanoTree(symbols, 0, symbols.Count - 1);
 
             //important
-            Dictionary<byte, string> codeTable = symbols.ToDictionary(n => n.character, n => n.code);
+            Dictionary<byte, string> codeTable = symbols.ToDictionary(n => n.Symbol, n => n.Code);
 
             string encodedBits = string.Join("", data.Select(b => codeTable[b]));
 
@@ -59,8 +56,8 @@ namespace Compression
                 // 4. Symbol-frequency pairs
                 foreach (var symbol in symbols)
                 {
-                    writer.Write(symbol.character);
-                    writer.Write(symbol.frequency);
+                    writer.Write(symbol.Symbol);
+                    writer.Write(symbol.Frequency);
                 }
 
                 // Write compressed data
@@ -114,9 +111,9 @@ namespace Compression
                 // Now create the output file with the correct name
                 using (FileStream output = new FileStream(finalOutputFile, FileMode.Create))
                 {
-                    List<Symbol> symbols = CreateSymbol(frequencies);
+                    List<Node> symbols = CreateSymbol(frequencies);
                     BuildShannonFanoTree(symbols, 0, symbols.Count - 1);
-                    Dictionary<string, byte> reverseCodeTable = symbols.ToDictionary(n => n.code, n => n.character);
+                    Dictionary<string, byte> reverseCodeTable = symbols.ToDictionary(n => n.Code, n => n.Symbol);
 
                     // Read compressed data
                     BitReader bitReader = new BitReader(reader);
@@ -137,46 +134,35 @@ namespace Compression
             }
         }
 
-        private static Dictionary<byte, int> CalculateFrequencies(byte[] data)
-        {
-            Dictionary<byte, int> frequencies = new Dictionary<byte, int>();
-            foreach (byte b in data)
-            {
-                if (frequencies.ContainsKey(b))
-                    frequencies[b]++;
-                else
-                    frequencies[b] = 1;
-            }
-            return frequencies;
-        }
-
-        private static List<Symbol> CreateSymbol(Dictionary<byte, int> frequencies)
+        private static List<Node> CreateSymbol(Dictionary<byte, int> frequencies)
         {
             //kvp:key value pair
-            return frequencies.Select(kvp => new Symbol
+            return frequencies.Select(kvp => new Node
             {
-                character = kvp.Key,
-                frequency = kvp.Value,
-                code = ""
+                Symbol = kvp.Key,
+                Frequency = kvp.Value,
+                Code = ""
             })
-            .OrderByDescending(n => n.frequency)
+            .OrderByDescending(n => n.Frequency)
             .ToList();
         }
 
-        private static void BuildShannonFanoTree(List<Symbol> nodes, int start, int end)
+        private static void BuildShannonFanoTree(List<Node> nodes, int start, int end)
         {
             if (start >= end)
                 return;
 
             //takes total from start to end to calculate all the current subset
-            int total = nodes.Skip(start).Take(end - start + 1).Sum(n => n.frequency);
+            int total = nodes.Skip(start).Take(end - start + 1).Sum(n => n.Frequency);
             int sum = 0;
             int split = start;
+
+            // the beneeth method is wrong to do (fix the for loop into two pointers from start and end)
 
             // Find the best split point
             for (int i = start; i <= end; i++)
             {
-                sum += nodes[i].frequency;
+                sum += nodes[i].Frequency;
                 if (sum * 2 >= total)
                 {
                     split = i;
@@ -187,7 +173,7 @@ namespace Compression
             // Assign codes
             for (int i = start; i <= end; i++)
             {
-                nodes[i].code += (i <= split) ? "1" : "0";
+                nodes[i].Code += (i <= split) ? "1" : "0";
             }
 
             // Recursively process both parts
