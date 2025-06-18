@@ -23,13 +23,25 @@ namespace Compression
         {
 
         }
-        private void btnBrowse_Click(object sender, EventArgs e)
+
+        private void fileBrowse_Click(object sender, EventArgs e)
         {
             using (OpenFileDialog openFileDialog = new OpenFileDialog())
             {
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    txtFilePath.Text = openFileDialog.FileName;
+                    txtPath.Text = openFileDialog.FileName;
+                }
+            }
+        }
+
+        private void folderBrowse_Click(object sender, EventArgs e)
+        {
+            using (FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog())
+            {
+                if (folderBrowserDialog.ShowDialog() == DialogResult.OK)
+                {
+                    txtPath.Text = folderBrowserDialog.SelectedPath;
                 }
             }
         }
@@ -38,38 +50,57 @@ namespace Compression
 
         private void ShannonDecompress_Click(object sender, EventArgs e) { }
 
-        private void HuffmanCompress_Click(object sender, EventArgs e)
+        private async void HuffmanCompress_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrEmpty(txtFilePath.Text) || !File.Exists(txtFilePath.Text))
+            // if (!Directory.Exists(folderPath))
+            if (string.IsNullOrEmpty(txtPath.Text))
             {
-                MessageBox.Show("Please select a valid file first.");
+                MessageBox.Show("Please select a valid file or folder.");
                 return;
             }
 
             try
             {
-                // Get data
-                var (data, ext, size) = helper.Readfile(txtFilePath.Text);
+                if (File.Exists(txtPath.Text))
+                {
+                    // Get data
+                    var (data, ext, size) = await helper.Readfile(txtPath.Text);
 
-                // Compress the data
-                Huffman compressor = new Huffman();
-                byte[] compressedData = compressor.Compress(data, ext);
-                long compressedSize = compressedData.Length;
+                    // Compress the data
+                    Huffman compressor = new Huffman();
+                    byte[] compressedData = await compressor.CompressFile(data, ext);
+                    long compressedSize = compressedData.Length;
 
-                // Save compressed file
-                string fileName = Path.GetFileName(txtFilePath.Text);
-                string filePath = txtFilePath.Text.Replace(fileName, "");
-                fileName = fileName.Replace("." + ext, "");
-                string compressedFilePath = filePath + fileName + "-compressed.huff";
-                helper.Writefile(compressedFilePath, compressedData);
+                    // Save compressed file
+                    string fileName = Path.GetFileName(txtPath.Text);
+                    string filePath = txtPath.Text.Replace(fileName, "");
+                    fileName = fileName.Replace("." + ext, "");
+                    string compressedFilePath = filePath + fileName + "-compressed.huff";
+                    await File.WriteAllBytesAsync(compressedFilePath, compressedData);
 
-                // Calculate and display compression ratio
-                double ratio = (double)compressedSize / size * 100;
-                lblResults.Text = $"Original: {size} bytes\n" +
-                                $"Compressed: {compressedSize} bytes\n" +
-                                $"Compression ratio: {ratio:F2}%";
+                    // Calculate and display compression ratio
+                    double ratio = (double)compressedSize / size * 100;
+                    lblResults.Text = $"Original: {size} bytes\n" +
+                                    $"Compressed: {compressedSize} bytes\n" +
+                                    $"Compression ratio: {ratio:F2}%";
 
-                MessageBox.Show($"File compressed successfully!\nSaved as: {compressedFilePath}");
+                    MessageBox.Show($"File compressed successfully!\nSaved as: {compressedFilePath}");
+                }
+                else if (Directory.Exists(txtPath.Text))
+                {
+                    // Get data
+                    var (files, distPath, dirName) = helper.ReadDirectory(txtPath.Text);
+
+                    // Compress the data
+                    Huffman compressor = new Huffman();
+                    await compressor.CompressDirectory(files, distPath, dirName);
+                    MessageBox.Show($"Folder compressed successfully!\nSaved as: {distPath}{dirName}.huff");
+                }
+                else
+                {
+                    MessageBox.Show($"Error during compression: {null}");
+                }
+                
             }
             catch (Exception ex)
             {
@@ -77,15 +108,15 @@ namespace Compression
             }
         }
 
-        private void HuffmanDecompress_Click(object sender, EventArgs e)
+        private async void HuffmanDecompress_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrEmpty(txtFilePath.Text) || !File.Exists(txtFilePath.Text))
+            if (string.IsNullOrEmpty(txtPath.Text) || !File.Exists(txtPath.Text))
             {
                 MessageBox.Show("Please select a valid file first.");
                 return;
             }
 
-            if (!txtFilePath.Text.EndsWith(".huff"))
+            if (!txtPath.Text.EndsWith(".huff"))
             {
                 MessageBox.Show("Please select a .huff compressed file.");
                 return;
@@ -93,25 +124,45 @@ namespace Compression
 
             try
             {
+                bool is_dir;
                 // Get data
-                var (data, _, size) = helper.Readfile(txtFilePath.Text);
+                var (data, _, size) = await helper.Readfile(txtPath.Text);
 
-                // Decompress the data
-                Huffman decompressor = new Huffman();
-                (byte[] decompressedData, string ext) = decompressor.Decompress(data);
-                long decompressedSize = decompressedData.Length;
+                using (var ms = new MemoryStream(data))
+                using (var reader = new BinaryReader(ms))
+                {
+                    // Read header
+                    is_dir = reader.ReadBoolean();
+                }
+                if (is_dir) 
+                {
+                    // Decompress the data
+                    Huffman decompressor = new Huffman();
+                    string dirPath = txtPath.Text.Replace("-compressed", "-decompressed");
+                    dirPath = txtPath.Text.Replace(".huff", "");
+                    await decompressor.DecompressDirectory(data, dirPath);
+                    MessageBox.Show($"Folder decompressed successfully!\nSaved as: {dirPath}");
+                }
+                else
+                {
+                    // Decompress the data
+                    Huffman decompressor = new Huffman();
+                    (byte[] decompressedData, string ext) = decompressor.DecompressFile(data);
+                    long decompressedSize = decompressedData.Length;
 
-                // Save decompressed file
-                string decompressedFilePath = txtFilePath.Text.Replace("-compressed.huff", "-decompressed." + ext);
-                helper.Writefile(decompressedFilePath, decompressedData);
+                    // Save decompressed file
+                    string decompressedFilePath = txtPath.Text.Replace("-compressed", "-decompressed");
+                    decompressedFilePath = txtPath.Text.Replace(".huff", "." + ext);
+                    await File.WriteAllBytesAsync(decompressedFilePath, decompressedData);
 
-                // Display results
-                double ratio = (double)size / decompressedSize * 100;
-                lblResults.Text = $"Compressed: {size} bytes\n" +
-                                $"Decompressed: {decompressedSize} bytes\n" +
-                                $"Compression ratio: {ratio:F2}%";
+                    // Display results
+                    double ratio = (double)size / decompressedSize * 100;
+                    lblResults.Text = $"Compressed: {size} bytes\n" +
+                                    $"Decompressed: {decompressedSize} bytes\n" +
+                                    $"Compression ratio: {ratio:F2}%";
 
-                MessageBox.Show($"File decompressed successfully!\nSaved as: {decompressedFilePath}");
+                    MessageBox.Show($"File decompressed successfully!\nSaved as: {decompressedFilePath}");
+                }
             }
             catch (Exception ex)
             {

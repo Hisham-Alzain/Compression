@@ -15,8 +15,9 @@
 
         private void InitializeComponent()
         {
-            this.txtFilePath = new System.Windows.Forms.TextBox();
-            this.btnBrowse = new System.Windows.Forms.Button();
+            this.txtPath = new System.Windows.Forms.TextBox();
+            this.fileBrowse = new System.Windows.Forms.Button();
+            this.folderBrowse = new System.Windows.Forms.Button();
             this.ShannonLabel = new System.Windows.Forms.Label();
             this.ShannonCompress = new System.Windows.Forms.Button();
             this.ShannonDecompress = new System.Windows.Forms.Button();
@@ -27,24 +28,35 @@
             this.label1 = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
-            // txtFilePath
+            // txtPath
             // 
-            this.txtFilePath.Location = new System.Drawing.Point(16, 58);
-            this.txtFilePath.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.txtFilePath.Name = "txtFilePath";
-            this.txtFilePath.Size = new System.Drawing.Size(513, 27);
-            this.txtFilePath.TabIndex = 0;
+            this.txtPath.Location = new System.Drawing.Point(16, 58);
+            this.txtPath.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.txtPath.Name = "txtPath";
+            this.txtPath.Size = new System.Drawing.Size(468, 27);
+            this.txtPath.TabIndex = 0;
             // 
-            // btnBrowse
+            // fileBrowse
             // 
-            this.btnBrowse.Location = new System.Drawing.Point(540, 55);
-            this.btnBrowse.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.btnBrowse.Name = "btnBrowse";
-            this.btnBrowse.Size = new System.Drawing.Size(140, 35);
-            this.btnBrowse.TabIndex = 1;
-            this.btnBrowse.Text = "Browse...";
-            this.btnBrowse.UseVisualStyleBackColor = true;
-            this.btnBrowse.Click += new System.EventHandler(this.btnBrowse_Click);
+            this.fileBrowse.Location = new System.Drawing.Point(494, 55);
+            this.fileBrowse.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.fileBrowse.Name = "fileBrowse";
+            this.fileBrowse.Size = new System.Drawing.Size(140, 35);
+            this.fileBrowse.TabIndex = 1;
+            this.fileBrowse.Text = "Browse file...";
+            this.fileBrowse.UseVisualStyleBackColor = true;
+            this.fileBrowse.Click += new System.EventHandler(this.fileBrowse_Click);
+            // 
+            // folderBrowse
+            // 
+            this.folderBrowse.Location = new System.Drawing.Point(644, 55);
+            this.folderBrowse.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.folderBrowse.Name = "folderBrowse";
+            this.folderBrowse.Size = new System.Drawing.Size(140, 35);
+            this.folderBrowse.TabIndex = 1;
+            this.folderBrowse.Text = "Browse folder...";
+            this.folderBrowse.UseVisualStyleBackColor = true;
+            this.folderBrowse.Click += new System.EventHandler(this.folderBrowse_Click);
             // 
             // ShannonLabel
             // 
@@ -142,8 +154,9 @@
             this.Controls.Add(this.HuffmanDecompress);
             this.Controls.Add(this.HuffmanCompress);
             this.Controls.Add(this.HuffmanLabel);
-            this.Controls.Add(this.btnBrowse);
-            this.Controls.Add(this.txtFilePath);
+            this.Controls.Add(this.folderBrowse);
+            this.Controls.Add(this.fileBrowse);
+            this.Controls.Add(this.txtPath);
             this.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.Name = "MainForm";
             this.Text = "File Compressor";
@@ -153,8 +166,9 @@
 
         }
 
-        private System.Windows.Forms.TextBox txtFilePath;
-        private System.Windows.Forms.Button btnBrowse;
+        private System.Windows.Forms.TextBox txtPath;
+        private System.Windows.Forms.Button fileBrowse;
+        private System.Windows.Forms.Button folderBrowse;
         private System.Windows.Forms.Label ShannonLabel;
         private System.Windows.Forms.Button ShannonCompress;
         private System.Windows.Forms.Button ShannonDecompress;

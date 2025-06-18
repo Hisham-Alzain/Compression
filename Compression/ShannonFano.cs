@@ -9,10 +9,10 @@
             helper = new Helper();
         }
 
-        public void Compress(string inputFile, string outputFile)
+        public async void Compress(string inputFile, string outputFile)
         {
             byte[] data = File.ReadAllBytes(inputFile);
-            Dictionary<byte, int> frequencies = helper.CalculateFrequencies(data);
+            Dictionary<byte, int> frequencies = await helper.CalculateFrequencies(data);
             List<Node> symbols = CreateSymbol(frequencies);
 
             BuildShannonFanoTree(symbols, 0, symbols.Count - 1);
