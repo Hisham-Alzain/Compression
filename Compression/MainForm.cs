@@ -61,6 +61,15 @@ namespace Compression
 
             try
             {
+                LockUnlockBtn(false);
+                progressBar.Value = 0;
+                lblStatus.Text = "Starting compression...";
+                var progress = new Progress<int>(percent =>
+                {
+                    progressBar.Value = percent;
+                    lblStatus.Text = $"Compressing... {percent}%";
+                });
+
                 if (File.Exists(txtPath.Text))
                 {
                     // Get data
@@ -68,7 +77,7 @@ namespace Compression
 
                     // Compress the data
                     Huffman compressor = new Huffman();
-                    byte[] compressedData = await compressor.CompressFile(data, ext);
+                    byte[] compressedData = await compressor.CompressFile(data, ext, progress);
                     long compressedSize = compressedData.Length;
 
                     // Save compressed file
@@ -93,7 +102,7 @@ namespace Compression
 
                     // Compress the data
                     Huffman compressor = new Huffman();
-                    await compressor.CompressDirectory(files, distPath, dirName);
+                    await compressor.CompressDirectory(files, distPath, dirName, progress);
                     MessageBox.Show($"Folder compressed successfully!\nSaved as: {distPath}{dirName}.huff");
                 }
                 else
@@ -105,6 +114,17 @@ namespace Compression
             catch (Exception ex)
             {
                 MessageBox.Show($"Error during compression: {ex.Message}");
+            }
+            finally
+            {
+                // Wait a moment for operations to complete
+                await Task.Delay(100);
+
+                // Reset UI
+                LockUnlockBtn(true);
+                progressBar.Value = 0;
+                lblStatus.Text = "Ready";
+                lblResults.Text = string.Empty;
             }
         }
 
@@ -125,6 +145,14 @@ namespace Compression
             try
             {
                 bool is_dir;
+                LockUnlockBtn(false);
+                progressBar.Value = 0;
+                lblStatus.Text = "Starting decompression...";
+                var progress = new Progress<int>(percent =>
+                {
+                    progressBar.Value = percent;
+                    lblStatus.Text = $"Decompressing... {percent}%";
+                });
                 // Get data
                 var (data, _, size) = await helper.Readfile(txtPath.Text);
 
@@ -140,14 +168,14 @@ namespace Compression
                     Huffman decompressor = new Huffman();
                     string dirPath = txtPath.Text.Replace("-compressed", "-decompressed");
                     dirPath = txtPath.Text.Replace(".huff", "");
-                    await decompressor.DecompressDirectory(data, dirPath);
+                    await decompressor.DecompressDirectory(data, dirPath, progress);
                     MessageBox.Show($"Folder decompressed successfully!\nSaved as: {dirPath}");
                 }
                 else
                 {
                     // Decompress the data
                     Huffman decompressor = new Huffman();
-                    (byte[] decompressedData, string ext) = decompressor.DecompressFile(data);
+                    (byte[] decompressedData, string ext) = decompressor.DecompressFile(data, progress);
                     long decompressedSize = decompressedData.Length;
 
                     // Save decompressed file
@@ -168,11 +196,32 @@ namespace Compression
             {
                 MessageBox.Show($"Error during decompression: {ex.Message}");
             }
+            finally
+            {
+                // Wait a moment for operations to complete
+                await Task.Delay(100);
+
+                // Reset UI
+                LockUnlockBtn(true);
+                progressBar.Value = 0;
+                lblStatus.Text = "Ready";
+                lblResults.Text = string.Empty;
+            }
         }
 
         private void MainForm_Load_1(object sender, EventArgs e)
         {
 
+        }
+
+        private void LockUnlockBtn(bool unlock = false)
+        {
+            fileBrowse.Enabled = unlock;
+            folderBrowse.Enabled = unlock;
+            ShannonCompress.Enabled = unlock;
+            ShannonDecompress.Enabled = unlock;
+            HuffmanCompress.Enabled = unlock;
+            HuffmanDecompress.Enabled = unlock;
         }
     }
 }

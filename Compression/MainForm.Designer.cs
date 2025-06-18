@@ -25,6 +25,7 @@
             this.HuffmanCompress = new System.Windows.Forms.Button();
             this.HuffmanDecompress = new System.Windows.Forms.Button();
             this.lblResults = new System.Windows.Forms.Label();
+            this.lblStatus = new System.Windows.Forms.Label();
             this.label1 = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
@@ -61,7 +62,7 @@
             // ShannonLabel
             // 
             this.ShannonLabel.AutoSize = true;
-            this.ShannonLabel.Location = new System.Drawing.Point(130, 115);
+            this.ShannonLabel.Location = new System.Drawing.Point(181, 115);
             this.ShannonLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.ShannonLabel.Name = "ShannonLabel";
             this.ShannonLabel.Size = new System.Drawing.Size(80, 23);
@@ -70,7 +71,7 @@
             // 
             // ShannonCompress
             // 
-            this.ShannonCompress.Location = new System.Drawing.Point(16, 150);
+            this.ShannonCompress.Location = new System.Drawing.Point(67, 150);
             this.ShannonCompress.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.ShannonCompress.Name = "ShannonCompress";
             this.ShannonCompress.Size = new System.Drawing.Size(160, 46);
@@ -81,7 +82,7 @@
             // 
             // ShannonDecompress
             // 
-            this.ShannonDecompress.Location = new System.Drawing.Point(184, 150);
+            this.ShannonDecompress.Location = new System.Drawing.Point(235, 150);
             this.ShannonDecompress.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.ShannonDecompress.Name = "ShannonDecompress";
             this.ShannonDecompress.Size = new System.Drawing.Size(160, 46);
@@ -93,7 +94,7 @@
             // HuffmanLabel
             // 
             this.HuffmanLabel.AutoSize = true;
-            this.HuffmanLabel.Location = new System.Drawing.Point(482, 115);
+            this.HuffmanLabel.Location = new System.Drawing.Point(535, 115);
             this.HuffmanLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.HuffmanLabel.Name = "HuffmanLabel";
             this.HuffmanLabel.Size = new System.Drawing.Size(80, 23);
@@ -102,7 +103,7 @@
             // 
             // HuffmanCompress
             // 
-            this.HuffmanCompress.Location = new System.Drawing.Point(352, 150);
+            this.HuffmanCompress.Location = new System.Drawing.Point(405, 150);
             this.HuffmanCompress.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.HuffmanCompress.Name = "HuffmanCompress";
             this.HuffmanCompress.Size = new System.Drawing.Size(160, 46);
@@ -113,7 +114,7 @@
             // 
             // HuffmanDecompress
             // 
-            this.HuffmanDecompress.Location = new System.Drawing.Point(520, 150);
+            this.HuffmanDecompress.Location = new System.Drawing.Point(573, 150);
             this.HuffmanDecompress.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.HuffmanDecompress.Name = "HuffmanDecompress";
             this.HuffmanDecompress.Size = new System.Drawing.Size(160, 46);
@@ -128,8 +129,18 @@
             this.lblResults.Location = new System.Drawing.Point(16, 232);
             this.lblResults.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.lblResults.Name = "lblResults";
-            this.lblResults.Size = new System.Drawing.Size(663, 122);
+            this.lblResults.Size = new System.Drawing.Size(763, 122);
             this.lblResults.TabIndex = 4;
+            // 
+            // lblStatus
+            // 
+            this.lblStatus.AutoSize = true;
+            this.lblStatus.Location = new System.Drawing.Point(16, 424);
+            this.lblStatus.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.lblStatus.Name = "lblStatus";
+            this.lblStatus.Size = new System.Drawing.Size(52, 20);
+            this.lblStatus.TabIndex = 8;
+            this.lblStatus.Text = "Ready";
             // 
             // label1
             // 
@@ -140,13 +151,25 @@
             this.label1.Size = new System.Drawing.Size(69, 20);
             this.label1.TabIndex = 5;
             this.label1.Text = "File path:";
+            //
+            // progress bar
+            //
+            this.progressBar = new System.Windows.Forms.ProgressBar();
+            this.progressBar.Location = new System.Drawing.Point(16, 370);
+            this.progressBar.Size = new System.Drawing.Size(763, 30);
+            this.progressBar.TabIndex = 6;
+            this.progressBar.Minimum = 0;
+            this.progressBar.Maximum = 100;
+            this.progressBar.Value = 0;
             // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 600);
+            this.Controls.Add(this.progressBar);
             this.Controls.Add(this.label1);
+            this.Controls.Add(this.lblStatus);
             this.Controls.Add(this.lblResults);
             this.Controls.Add(this.ShannonDecompress);
             this.Controls.Add(this.ShannonCompress);
@@ -176,6 +199,8 @@
         private System.Windows.Forms.Button HuffmanCompress;
         private System.Windows.Forms.Button HuffmanDecompress;
         private System.Windows.Forms.Label lblResults;
+        private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.ProgressBar progressBar;
     }
 }

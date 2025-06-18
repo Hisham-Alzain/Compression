@@ -1,53 +1,61 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace Compression
 {
     public class Huffman
     {
         private Helper helper;
-        private int bufferSize = 1024 * 1024; // 1MB buffer for processing large files
+        private int bufferSize = 1024 * 1024;
 
         public Huffman()
         {
             helper = new Helper();
         }
 
-        public async Task CompressDirectory(List<(string FullPath, string RelativePath)> files, string distPath, string dirName)
+        public async Task CompressDirectory(List<(string FullPath, string RelativePath)> files, string distPath, string dirName, IProgress<int> progress = null)
         {
-            string outputPath = Path.Combine(distPath, dirName+"-compressed.huff");
+            string outputPath = Path.Combine(distPath, dirName + "-compressed.huff");
             using (var fs = new FileStream(outputPath, FileMode.Create))
             using (var writer = new BinaryWriter(fs))
             {
-                // check if directory to header
-                writer.Write(true);   // 1 Byte
-                // Write header information
-                // 1. Number of files (4 bytes)
+                writer.Write(true);
                 writer.Write(files.Count);
 
-                // 2. For each file: relative path length, relative path, original file size
                 foreach (var file in files)
                 {
-                    writer.Write(file.RelativePath);
+                    byte[] pathBytes = Encoding.UTF8.GetBytes(file.RelativePath);
+                    writer.Write((short)pathBytes.Length);
+                    writer.Write(pathBytes);
                     writer.Write(new FileInfo(file.FullPath).Length);
                 }
 
-                // Process files in parallel and write compressed data
                 var compressedFiles = new ConcurrentDictionary<string, byte[]>();
+                int processedFiles = 0;
 
                 await Parallel.ForEachAsync(files, async (file, cancellationToken) =>
                 {
-                    var (data, ext, size) = await helper.Readfile(file.FullPath);
-                    byte[] compressedData = await CompressFile(data, ext);
-                    compressedFiles.TryAdd(file.RelativePath, compressedData);
+                    try
+                    {
+                        var (data, ext, size) = await helper.Readfile(file.FullPath);
+                        byte[] compressedData = await CompressFile(data, ext, progress);
+                        compressedFiles.TryAdd(file.RelativePath, compressedData);
+
+                        Interlocked.Increment(ref processedFiles);
+                        progress?.Report((int)((double)processedFiles / files.Count * 100));
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"Error compressing {file.FullPath}: {ex.Message}");
+                    }
                 });
 
-                // Write compressed data in order
                 foreach (var file in files)
                 {
                     if (compressedFiles.TryGetValue(file.RelativePath, out var data))
@@ -59,7 +67,7 @@ namespace Compression
             }
         }
 
-        public async Task DecompressDirectory(byte[] compressedData, string dirPath)
+        public async Task DecompressDirectory(byte[] compressedData, string dirPath, IProgress<int> progress = null)
         {
             if (compressedData == null || compressedData.Length == 0)
                 return;
@@ -67,78 +75,75 @@ namespace Compression
             using (var ms = new MemoryStream(compressedData))
             using (var reader = new BinaryReader(ms))
             {
-                // Read header
                 bool is_dir = reader.ReadBoolean();
-                if (!is_dir)
-                {
-                    return;
-                }
+                if (!is_dir) return;
+
                 Directory.CreateDirectory(dirPath);
                 int fileCount = reader.ReadInt32();
 
-                // Read file metadata
                 var fileEntries = new List<(string RelativePath, long OriginalSize)>();
                 for (int i = 0; i < fileCount; i++)
                 {
-                    string relativePath = reader.ReadString();
+                    short pathLength = reader.ReadInt16();
+                    string relativePath = Encoding.UTF8.GetString(reader.ReadBytes(pathLength));
                     long originalSize = reader.ReadInt64();
                     fileEntries.Add((relativePath, originalSize));
                 }
 
-                // Process each file
-                foreach (var entry in fileEntries)
+                for (int i = 0; i < fileEntries.Count; i++)
                 {
                     int fileSize = reader.ReadInt32();
+                    if (fileSize == 0)
+                    {
+                        string emptyFilePath = Path.Combine(dirPath, fileEntries[i].RelativePath);
+                        Directory.CreateDirectory(Path.GetDirectoryName(emptyFilePath));
+                        File.Create(emptyFilePath).Dispose();
+                        continue;
+                    }
+
                     byte[] fileData = reader.ReadBytes(fileSize);
-
-                    // Decompress the file
-                    var (data, _) = DecompressFile(fileData);
-
-                    // Recreate directory structure
-                    string outputPath = Path.Combine(dirPath, entry.RelativePath);
+                    var (data, _) = DecompressFile(fileData, progress);
+                    string outputPath = Path.Combine(dirPath, fileEntries[i].RelativePath);
                     Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
-
-                    // Write decompressed file
                     await File.WriteAllBytesAsync(outputPath, data);
+                    progress?.Report((int)((double)(i + 1) / fileCount * 100));
                 }
             }
         }
 
-        public async Task<byte[]> CompressFile(byte[] data, string ext)
+        public async Task<byte[]> CompressFile(byte[] data, string ext, IProgress<int> progress = null)
         {
             if (data == null || data.Length == 0)
                 return new byte[0];
 
-            // Calculate frequencies
             Dictionary<byte, int> frequencies = await helper.CalculateFrequencies(data);
-
-            // Build Huffman tree
             var root = BuildHuffmanTree(frequencies);
 
-            // Generate Huffman codes
             var codes = new Dictionary<byte, string>();
             GenerateCodes(root, "", codes);
 
-            // Encode the data
             var bitString = new StringBuilder();
-            byte[] buffer = new byte[bufferSize];
+            int processedBytes = 0;
             foreach (byte b in data)
             {
                 bitString.Append(codes[b]);
+                processedBytes++;
+
+                if (processedBytes % 1000 == 0) // Report progress every 1000 bytes
+                {
+                    progress?.Report((int)((double)processedBytes / data.Length * 100));
+                }
             }
 
-            // Convert bit string to bytes with exact bit count
-            int totalBits = bitString.Length;
+                int totalBits = bitString.Length;
             int totalBytes = (totalBits + 7) / 8;
             byte[] compressedBytes = new byte[totalBytes];
-            int byteIndex = 0, bitIndex = 0;
 
+            int byteIndex = 0, bitIndex = 0;
             for (int i = 0; i < totalBits; i++)
             {
                 if (bitString[i] == '1')
-                {
                     compressedBytes[byteIndex] |= (byte)(1 << (7 - bitIndex));
-                }
 
                 bitIndex++;
                 if (bitIndex == 8)
@@ -148,51 +153,38 @@ namespace Compression
                 }
             }
 
-            // Prepare final output (header + compressed data)
             using (var ms = new MemoryStream())
             using (var writer = new BinaryWriter(ms))
             {
-                // Write header
                 writer.Write(false);
-                // 1. Original extension length (1 byte)
                 writer.Write((byte)ext.Length);
-                // 2. Original extension (ASCII)
                 writer.Write(ext.ToCharArray());
-                // 3. frequency table and total bits
                 writer.Write(frequencies.Count);
                 foreach (var pair in frequencies)
                 {
                     writer.Write(pair.Key);
                     writer.Write(pair.Value);
                 }
-                writer.Write(totalBits); // Store exact number of bits
-
-                // Write compressed data
+                writer.Write(totalBits);
                 writer.Write(compressedBytes);
-
                 return ms.ToArray();
             }
         }
 
-        public (byte[] data, string ext) DecompressFile(byte[] compressedData)
+        public (byte[] data, string ext) DecompressFile(byte[] compressedData, IProgress<int> progress = null)
         {
             if (compressedData == null || compressedData.Length == 0)
-                return (data: new byte[0], ext: null);
+                return (new byte[0], null);
 
             using (var ms = new MemoryStream(compressedData))
             using (var reader = new BinaryReader(ms))
             {
-                // Read header
                 bool is_dir = reader.ReadBoolean();
-                if (is_dir) 
-                {
-                    return (data: new byte[0], ext: null);
-                }
-                // 1. Original extension length
+                if (is_dir) return (new byte[0], null);
+
                 byte extensionLength = reader.ReadByte();
-                // 2. Original extension
                 string originalExtension = new string(reader.ReadChars(extensionLength));
-                // 3. Read frequency table
+
                 int count = reader.ReadInt32();
                 var frequencies = new Dictionary<byte, int>();
                 for (int i = 0; i < count; i++)
@@ -202,33 +194,29 @@ namespace Compression
                     frequencies[symbol] = frequency;
                 }
 
-                // Read exact number of bits
                 int totalBits = reader.ReadInt32();
-
-                // Rebuild Huffman tree
                 var root = BuildHuffmanTree(frequencies);
 
-                // Read compressed data
                 byte[] compressedBytes = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-                // Convert bytes back to bits
                 var bitString = new StringBuilder();
                 for (int i = 0; i < compressedBytes.Length && bitString.Length < totalBits; i++)
                 {
                     for (int j = 7; j >= 0 && bitString.Length < totalBits; j--)
-                    {
+                    { 
                         bitString.Append((compressedBytes[i] & (1 << j)) != 0 ? '1' : '0');
+                    }
+                    if (i % 1000 == 0) // Report progress every 1000 bytes
+                    {
+                        progress?.Report((int)((double)i / compressedBytes.Length * 100));
                     }
                 }
 
-                // Decode the data
                 var decompressedData = new List<byte>();
                 var current = root;
-
                 for (int i = 0; i < totalBits; i++)
                 {
                     current = bitString[i] == '0' ? current.Left : current.Right;
-
                     if (current.IsLeaf())
                     {
                         decompressedData.Add(current.Symbol);
@@ -236,17 +224,16 @@ namespace Compression
                     }
                 }
 
-                return (data: decompressedData.ToArray(), ext: originalExtension);
+                return (decompressedData.ToArray(), originalExtension);
             }
         }
 
         private Node BuildHuffmanTree(Dictionary<byte, int> frequencies)
         {
             var priorityQueue = new PriorityQueue<Node>();
-
             foreach (var symbol in frequencies)
             {
-                priorityQueue.Enqueue(new Node()
+                priorityQueue.Enqueue(new Node
                 {
                     Symbol = symbol.Key,
                     Frequency = symbol.Value,
@@ -258,20 +245,19 @@ namespace Compression
             {
                 var left = priorityQueue.Dequeue();
                 var right = priorityQueue.Dequeue();
-
-                var parent = new Node()
+                var parent = new Node
                 {
                     Frequency = left.Frequency + right.Frequency,
                     Code = "",
                     Left = left,
                     Right = right
                 };
-
                 priorityQueue.Enqueue(parent);
             }
 
             return priorityQueue.Dequeue();
         }
+
         private void GenerateCodes(Node node, string code, Dictionary<byte, string> codes)
         {
             if (node.IsLeaf())
@@ -285,14 +271,10 @@ namespace Compression
             GenerateCodes(node.Right, code + "1", codes);
         }
     }
+
     public class PriorityQueue<T> where T : IComparable<T>
     {
-        private List<T> data;
-
-        public PriorityQueue()
-        {
-            this.data = new List<T>();
-        }
+        private List<T> data = new List<T>();
 
         public void Enqueue(T item)
         {
@@ -301,17 +283,15 @@ namespace Compression
             while (ci > 0)
             {
                 int pi = (ci - 1) / 2;
-                if (data[ci].CompareTo(data[pi]) >= 0)
-                    break;
-                T tmp = data[ci]; data[ci] = data[pi]; data[pi] = tmp;
+                if (data[ci].CompareTo(data[pi]) >= 0) break;
+                (data[ci], data[pi]) = (data[pi], data[ci]);
                 ci = pi;
             }
         }
 
         public T Dequeue()
         {
-            if (data.Count == 0)
-                throw new InvalidOperationException("Queue is empty");
+            if (data.Count == 0) throw new InvalidOperationException("Queue is empty");
 
             int li = data.Count - 1;
             T frontItem = data[0];
@@ -325,18 +305,14 @@ namespace Compression
                 int ci = pi * 2 + 1;
                 if (ci > li) break;
                 int rc = ci + 1;
-                if (rc <= li && data[rc].CompareTo(data[ci]) < 0)
-                    ci = rc;
+                if (rc <= li && data[rc].CompareTo(data[ci]) < 0) ci = rc;
                 if (data[pi].CompareTo(data[ci]) <= 0) break;
-                T tmp = data[pi]; data[pi] = data[ci]; data[ci] = tmp;
+                (data[pi], data[ci]) = (data[ci], data[pi]);
                 pi = ci;
             }
             return frontItem;
         }
 
-        public int Count
-        {
-            get { return data.Count; }
-        }
+        public int Count => data.Count;
     }
 }
