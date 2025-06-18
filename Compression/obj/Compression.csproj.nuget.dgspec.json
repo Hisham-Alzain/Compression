@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "D:\\draw_university\\Compression\\Compression\\Compression.csproj": {}
+    "D:\\University\\MultiMedia\\Project\\Compression\\Compression\\Compression.csproj": {}
   },
   "projects": {
-    "D:\\draw_university\\Compression\\Compression\\Compression.csproj": {
+    "D:\\University\\MultiMedia\\Project\\Compression\\Compression\\Compression.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\draw_university\\Compression\\Compression\\Compression.csproj",
+        "projectUniqueName": "D:\\University\\MultiMedia\\Project\\Compression\\Compression\\Compression.csproj",
         "projectName": "Compression",
-        "projectPath": "D:\\draw_university\\Compression\\Compression\\Compression.csproj",
-        "packagesPath": "C:\\Users\\GHASSAN\\.nuget\\packages\\",
-        "outputPath": "D:\\draw_university\\Compression\\Compression\\obj\\",
+        "projectPath": "D:\\University\\MultiMedia\\Project\\Compression\\Compression\\Compression.csproj",
+        "packagesPath": "C:\\Users\\MZ\\.nuget\\packages\\",
+        "outputPath": "D:\\University\\MultiMedia\\Project\\Compression\\Compression\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\GHASSAN\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\MZ\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],

@@ -11,7 +11,7 @@ namespace Compression
 {
     public class Huffman
     {
-        private Helper helper;
+        private readonly Helper helper;
         private int bufferSize = 1024 * 1024;
 
         public Huffman()
@@ -25,7 +25,7 @@ namespace Compression
             using (var fs = new FileStream(outputPath, FileMode.Create))
             using (var writer = new BinaryWriter(fs))
             {
-                writer.Write(true);
+                writer.Write(true); // Is directory
                 writer.Write(files.Count);
 
                 foreach (var file in files)
@@ -90,23 +90,22 @@ namespace Compression
                     fileEntries.Add((relativePath, originalSize));
                 }
 
-                for (int i = 0; i < fileEntries.Count; i++)
+                long processedFiles = 0;
+                // await Parallel.ForEachAsync(fileEntries, async (entry, cancellationToken) =>
+                // {
+                foreach (var entry in fileEntries)
                 {
                     int fileSize = reader.ReadInt32();
-                    if (fileSize == 0)
-                    {
-                        string emptyFilePath = Path.Combine(dirPath, fileEntries[i].RelativePath);
-                        Directory.CreateDirectory(Path.GetDirectoryName(emptyFilePath));
-                        File.Create(emptyFilePath).Dispose();
-                        continue;
-                    }
-
                     byte[] fileData = reader.ReadBytes(fileSize);
+
                     var (data, _) = DecompressFile(fileData, progress);
-                    string outputPath = Path.Combine(dirPath, fileEntries[i].RelativePath);
+                    string outputPath = Path.Combine(dirPath, entry.RelativePath);
                     Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
                     await File.WriteAllBytesAsync(outputPath, data);
-                    progress?.Report((int)((double)(i + 1) / fileCount * 100));
+
+                    Interlocked.Increment(ref processedFiles);
+                    progress?.Report((int)(processedFiles / fileCount * 100));
+                //});
                 }
             }
         }
@@ -122,41 +121,14 @@ namespace Compression
             var codes = new Dictionary<byte, string>();
             GenerateCodes(root, "", codes);
 
-            var bitString = new StringBuilder();
-            int processedBytes = 0;
-            foreach (byte b in data)
-            {
-                bitString.Append(codes[b]);
-                processedBytes++;
-
-                if (processedBytes % 1000 == 0) // Report progress every 1000 bytes
-                {
-                    progress?.Report((int)((double)processedBytes / data.Length * 100));
-                }
-            }
-
-                int totalBits = bitString.Length;
-            int totalBytes = (totalBits + 7) / 8;
-            byte[] compressedBytes = new byte[totalBytes];
-
-            int byteIndex = 0, bitIndex = 0;
-            for (int i = 0; i < totalBits; i++)
-            {
-                if (bitString[i] == '1')
-                    compressedBytes[byteIndex] |= (byte)(1 << (7 - bitIndex));
-
-                bitIndex++;
-                if (bitIndex == 8)
-                {
-                    bitIndex = 0;
-                    byteIndex++;
-                }
-            }
-
+            // Write header + frequency table
             using (var ms = new MemoryStream())
             using (var writer = new BinaryWriter(ms))
             {
-                writer.Write(false);
+                var bitWriter = new BitWriter(writer);
+
+                // Write header info
+                writer.Write(false); // Not a directory
                 writer.Write((byte)ext.Length);
                 writer.Write(ext.ToCharArray());
                 writer.Write(frequencies.Count);
@@ -165,8 +137,36 @@ namespace Compression
                     writer.Write(pair.Key);
                     writer.Write(pair.Value);
                 }
+
+                // First pass: calculate total bits needed
+                long totalBits = 0;
+                foreach (byte b in data)
+                {
+                    totalBits += codes[b].Length;
+                }
                 writer.Write(totalBits);
-                writer.Write(compressedBytes);
+
+                // Second pass: write actual bits
+                int processedBytes = 0;
+                foreach (byte b in data)
+                {
+                    string code = codes[b];
+                    foreach (char bit in code)
+                    {
+                        bitWriter.WriteBit(bit == '1');
+                    }
+
+                    processedBytes++;
+                    if (processedBytes % 1000 == 0) // Report progress every 1000 bytes
+                    {
+                        progress?.Report((int)((double)processedBytes / data.Length * 100));
+                    }
+                }
+
+                // remember to flush
+                bitWriter.Flush();
+
+                // return data
                 return ms.ToArray();
             }
         }
@@ -194,33 +194,33 @@ namespace Compression
                     frequencies[symbol] = frequency;
                 }
 
-                int totalBits = reader.ReadInt32();
+                long totalBits = reader.ReadInt64();
                 var root = BuildHuffmanTree(frequencies);
 
-                byte[] compressedBytes = reader.ReadBytes((int)(ms.Length - ms.Position));
-
-                var bitString = new StringBuilder();
-                for (int i = 0; i < compressedBytes.Length && bitString.Length < totalBits; i++)
-                {
-                    for (int j = 7; j >= 0 && bitString.Length < totalBits; j--)
-                    { 
-                        bitString.Append((compressedBytes[i] & (1 << j)) != 0 ? '1' : '0');
-                    }
-                    if (i % 1000 == 0) // Report progress every 1000 bytes
-                    {
-                        progress?.Report((int)((double)i / compressedBytes.Length * 100));
-                    }
-                }
-
+                var bitReader = new BitReader(reader);
                 var decompressedData = new List<byte>();
-                var current = root;
-                for (int i = 0; i < totalBits; i++)
+                long bitsRead = 0;
+
+                while (bitsRead < totalBits)
                 {
-                    current = bitString[i] == '0' ? current.Left : current.Right;
-                    if (current.IsLeaf())
+                    var node = root;
+                    while (!node.IsLeaf())
                     {
-                        decompressedData.Add(current.Symbol);
-                        current = root;
+                        bool? bit = bitReader.ReadBit();
+                        if (bit == null) break;
+
+                        bitsRead++;
+                        node = bit.Value ? node.Right : node.Left;
+                    }
+
+                    if (node.IsLeaf())
+                    {
+                        decompressedData.Add(node.Symbol);
+                    }
+
+                    if (bitsRead % 1000 == 0) // Report progress every 1000 bits
+                    {
+                        progress?.Report((int)((double)bitsRead / totalBits * 100));
                     }
                 }
 

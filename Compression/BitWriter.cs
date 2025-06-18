@@ -1,16 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.IO;
 
 namespace Compression
 {
     public class BitWriter
     {
         private readonly BinaryWriter writer;
-        private byte currentByte;
-        private int bitPosition;
+        private byte currentByte = 0;
+        private int bitPosition = 0;
 
         public BitWriter(BinaryWriter writer)
         {

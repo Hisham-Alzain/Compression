@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.IO;
 
 namespace Compression
 {
@@ -11,7 +8,7 @@ namespace Compression
         private readonly BinaryReader reader;
         private byte currentByte;
         private int bitPosition;
-        private bool endOfStream;
+        private bool endOfStream = false;
 
         public BitReader(BinaryReader reader)
         {
@@ -20,6 +17,7 @@ namespace Compression
 
         public bool? ReadBit()
         {
+            if (endOfStream) return null;
             if (bitPosition == 0)
             {
                 try

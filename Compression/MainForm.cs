@@ -103,7 +103,7 @@ namespace Compression
                     // Compress the data
                     Huffman compressor = new Huffman();
                     await compressor.CompressDirectory(files, distPath, dirName, progress);
-                    MessageBox.Show($"Folder compressed successfully!\nSaved as: {distPath}{dirName}.huff");
+                    MessageBox.Show($"Folder compressed successfully!\nSaved as: {distPath}{dirName}-compressed.huff");
                 }
                 else
                 {
