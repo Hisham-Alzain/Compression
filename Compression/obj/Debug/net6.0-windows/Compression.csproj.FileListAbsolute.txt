@@ -20,7 +20,6 @@ D:\draw_university\Compression\Compression\bin\Debug\net6.0-windows\Compression.
 D:\draw_university\Compression\Compression\bin\Debug\net6.0-windows\Compression.runtimeconfig.json
 D:\draw_university\Compression\Compression\bin\Debug\net6.0-windows\Compression.dll
 D:\draw_university\Compression\Compression\bin\Debug\net6.0-windows\Compression.pdb
-D:\draw_university\Compression\Compression\obj\Debug\net6.0-windows\Compression.csproj.AssemblyReference.cache
 D:\draw_university\Compression\Compression\obj\Debug\net6.0-windows\Compression.csproj.GenerateResource.cache
 D:\draw_university\Compression\Compression\obj\Debug\net6.0-windows\Compression.GeneratedMSBuildEditorConfig.editorconfig
 D:\draw_university\Compression\Compression\obj\Debug\net6.0-windows\Compression.AssemblyInfoInputs.cache
@@ -32,3 +31,4 @@ D:\draw_university\Compression\Compression\obj\Debug\net6.0-windows\Compression.
 D:\draw_university\Compression\Compression\obj\Debug\net6.0-windows\Compression.genruntimeconfig.cache
 D:\draw_university\Compression\Compression\obj\Debug\net6.0-windows\ref\Compression.dll
 D:\draw_university\Compression\Compression\obj\Debug\net6.0-windows\Compression.MainForm.resources
+D:\draw_university\Compression\Compression\obj\Debug\net6.0-windows\Compression.sourcelink.json
