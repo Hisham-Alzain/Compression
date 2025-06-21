@@ -1,14 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Security.Policy;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 
 namespace Compression
 {
@@ -26,12 +16,10 @@ namespace Compression
         {
             InitializeComponent();
             helper = new Helper();
-            pauseEvent = new ManualResetEventSlim(true);
 
-            // lock buttons
-            btnCancel.Enabled = false;
-            btnPause.Enabled = false;
-            btnResume.Enabled = false;
+            LockPauseResumeCancel();
+            cts = new CancellationTokenSource();
+            pauseEvent = new ManualResetEventSlim(true);
         }
 
         private void MainForm_Load(object sender, EventArgs e)
@@ -67,12 +55,13 @@ namespace Compression
 
         private async void HuffmanCompress_Click(object sender, EventArgs e)
         {
-            // if (!Directory.Exists(folderPath))
             if (string.IsNullOrEmpty(txtPath.Text))
             {
                 MessageBox.Show("Please select a valid file or folder.");
                 return;
             }
+
+            string compressedFilePath = "";
 
             try
             {
@@ -82,64 +71,79 @@ namespace Compression
                 var progress = new Progress<int>(percent =>
                 {
                     progressBar.Value = percent;
-                    lblStatus.Text = $"Compressing... {percent}%";
+                    lblStatus.Text = isPaused? $"Paused... {percent}%" : $"Compressing... {percent}%";
                 });
+                UnLockPauseCancel();
 
-                // Initialize new cancellation and pauseEvent
-                cts = new CancellationTokenSource();
-                pauseEvent = new ManualResetEventSlim(true);
-                isPaused = false;
-
-                // Unlock pause & cancel
-                btnPause.Enabled = true;
-                btnCancel.Enabled = true;
-                btnResume.Enabled = false;
-
+                ResetPauseEvent();
+                ResetCancellationToken();
+                // Initialize huffman and run on a new task
                 Huffman compressor = new Huffman(pauseEvent);
-
-                if (File.Exists(txtPath.Text))
+                await Task.Run(async () =>
                 {
-                    // Get data
-                    var (data, ext, size) = await helper.Readfile(txtPath.Text);
+                    if (File.Exists(txtPath.Text))
+                    {
+                        // Get data
+                        var (data, ext, size) = await helper.Readfile(txtPath.Text);
 
-                    // Compress the data
-                    byte[] compressedData = await compressor.CompressFile(data, ext, progress, cts.Token);
-                    long compressedSize = compressedData.Length;
+                        // Compress the data
+                        byte[] compressedData = await compressor.CompressFile(data, ext, progress, cts.Token);
+                        long compressedSize = compressedData.Length;
 
-                    // Save compressed file
-                    string fileName = Path.GetFileName(txtPath.Text);
-                    string filePath = txtPath.Text.Replace(fileName, "");
-                    fileName = fileName.Replace("." + ext, "");
-                    string compressedFilePath = filePath + fileName + "-compressed.huff";
-                    await File.WriteAllBytesAsync(compressedFilePath, compressedData);
+                        // Prepare compressed path
+                        string fileName = Path.GetFileName(txtPath.Text);
+                        string filePath = txtPath.Text.Replace(fileName, "");
+                        string compressedName = fileName.Replace("." + ext, "");
+                        compressedFilePath = filePath + compressedName + "-compressed.huff";
 
-                    // Calculate and display compression ratio
-                    double ratio = helper.CalculateRatio(compressedSize, size);
+                        // Save compressed file
+                        await File.WriteAllBytesAsync(compressedFilePath, compressedData, cts.Token);
 
-                    lblResults.Text = $"Original: {size} bytes\n" +
+                        // Calculate and display compression ratio
+                        double ratio = helper.CalculateRatio(compressedSize, size);
+                        this.Invoke(new Action(() =>
+                        {
+                            lblResults.Text = $"Original: {size} bytes\n" +
                                     $"Compressed: {compressedSize} bytes\n" +
                                     $"Compression ratio: {ratio:F2}%";
 
-                    MessageBox.Show($"File compressed successfully!\nSaved as: {compressedFilePath}");
-                }
-                else if (Directory.Exists(txtPath.Text))
-                {
-                    // Get data
-                    var (files, distPath, dirName) = helper.ReadDirectory(txtPath.Text);
+                            MessageBox.Show($"File compressed successfully!\nSaved as: {compressedFilePath}");
+                        }));
+                    }
+                    else if (Directory.Exists(txtPath.Text))
+                    {
+                        // Get data
+                        var (files, distPath, dirName) = helper.ReadDirectory(txtPath.Text);
 
-                    // Compress the data
-                    await compressor.CompressDirectory(files, distPath, dirName, progress, cts.Token);
-                    MessageBox.Show($"Folder compressed successfully!\nSaved as: {distPath}{dirName}-compressed.huff");
-                }
-                else
-                {
-                    MessageBox.Show($"Error during compression: {null}");
-                }
-                
+                        // Prepare compressed path
+                        compressedFilePath = Path.Combine(distPath, dirName + "-compressed.huff");
+
+                        // Compress and save the data
+                        await compressor.CompressDirectory(files, compressedFilePath, progress, cts.Token);
+
+                        this.Invoke(new Action(() =>
+                        {
+                            MessageBox.Show($"Folder compressed successfully!\nSaved as: {compressedFilePath}");
+                        }));
+                    }
+                    else
+                    {
+                        this.Invoke(new Action(() =>
+                        {
+                            MessageBox.Show($"Error during compression: {null}");
+                        }));
+                    }
+                });
             }
             catch (OperationCanceledException)
             {
                 lblStatus.Text = "Compression canceled";
+                // Clean up partial output file if it exists
+                if (File.Exists(compressedFilePath))
+                {
+                    try { File.Delete(compressedFilePath); }
+                    catch { /* Ignore deletion errors */ }
+                }
                 MessageBox.Show("Compression was canceled.");
             }
             catch (Exception ex)
@@ -148,32 +152,8 @@ namespace Compression
             }
             finally
             {
-                // Wait a moment for operations to complete
                 await Task.Delay(100);
-
-                // Reset UI
-                LockUnlockBtn(true);
-
-                // lock buttons
-                btnCancel.Enabled = false;
-                btnPause.Enabled = false;
-                btnResume.Enabled = false;
-
-                progressBar.Value = 0;
-                lblStatus.Text = "Ready";
-                lblResults.Text = string.Empty;
-
-                //// Clean up resources
-                //pauseEvent?.Set();
-                //cts?.Dispose();
-                //pauseEvent?.Dispose();
-
-                // reset event
-                pauseEvent?.Dispose();
-                pauseEvent = new ManualResetEventSlim(true);
-                // reset cts
-                cts?.Dispose();
-                cts = new CancellationTokenSource();
+                ResetUI();
             }
         }
 
@@ -191,6 +171,7 @@ namespace Compression
                 return;
             }
 
+            string decompressedPath = "";
             try
             {
                 bool is_dir;
@@ -200,63 +181,78 @@ namespace Compression
                 var progress = new Progress<int>(percent =>
                 {
                     progressBar.Value = percent;
-                    lblStatus.Text = $"Decompressing... {percent}%";
+                    lblStatus.Text = isPaused? $"Paused... {percent}%" : $"Decompressing... {percent}%";
                 });
+                UnLockPauseCancel();
 
-                // Initialize new cancellation and pauseEvent
-                cts = new CancellationTokenSource();
-                pauseEvent = new ManualResetEventSlim(true);
-                isPaused = false;
-
-                // Unlock pause & cancel
-                btnPause.Enabled = true;
-                btnCancel.Enabled = true;
-                btnResume.Enabled = false;
-
+                ResetPauseEvent();
+                ResetCancellationToken();
+                // Initialize huffman and run on a new task
                 Huffman decompressor = new Huffman(pauseEvent);
-
-                // Get data
-                var (data, _, size) = await helper.Readfile(txtPath.Text);
-
-                using (var ms = new MemoryStream(data))
-                using (var reader = new BinaryReader(ms))
+                await Task.Run(async () =>
                 {
-                    // Read header
-                    is_dir = reader.ReadBoolean();
-                }
+                    // Get data
+                    var (data, _, size) = await helper.Readfile(txtPath.Text);
 
-                if (is_dir) 
-                {
-                    // Decompress the data
-                    string dirPath = txtPath.Text.Replace("-compressed", "-decompressed");
-                    dirPath = txtPath.Text.Replace(".huff", "");
-                    await decompressor.DecompressDirectory(data, dirPath, progress, cts.Token);
-                    MessageBox.Show($"Folder decompressed successfully!\nSaved as: {dirPath}");
-                }
-                else
-                {
-                    // Decompress the data
-                    (byte[] decompressedData, string ext) = decompressor.DecompressFile(data, progress, cts.Token);
-                    long decompressedSize = decompressedData.Length;
+                    using (var ms = new MemoryStream(data))
+                    using (var reader = new BinaryReader(ms))
+                    {
+                        // Read header
+                        is_dir = reader.ReadBoolean();
+                    }
 
-                    // Save decompressed file
-                    string decompressedFilePath = txtPath.Text.Replace("-compressed", "-decompressed");
-                    decompressedFilePath = txtPath.Text.Replace(".huff", "." + ext);
-                    await File.WriteAllBytesAsync(decompressedFilePath, decompressedData);
+                    if (is_dir) 
+                    {
+                        // Prepare decompressed path
+                        decompressedPath = txtPath.Text.Replace("-compressed", "-decompressed").Replace(".huff", "");
 
-                    // Display results
-                    double ratio = helper.CalculateRatio(size, decompressedSize);
+                        // Decompress and save the data
+                        await decompressor.DecompressDirectory(data, decompressedPath, progress, cts.Token);
+                        this.Invoke(new Action(() =>
+                        {
+                            MessageBox.Show($"Folder decompressed successfully!\nSaved as: {decompressedPath}");
+                        }));
+                    }
+                    else
+                    {
+                        // Decompress the data
+                        (byte[] decompressedData, string ext) = await decompressor.DecompressFile(data, progress, cts.Token);
+                        long decompressedSize = decompressedData.Length;
 
-                    lblResults.Text = $"Compressed: {size} bytes\n" +
-                                    $"Decompressed: {decompressedSize} bytes\n" +
-                                    $"Compression ratio: {ratio:F2}%";
+                        // Prepare decompressed path
+                        decompressedPath = txtPath.Text.Replace("-compressed", "-decompressed").Replace(".huff", "." + ext);
 
-                    MessageBox.Show($"File decompressed successfully!\nSaved as: {decompressedFilePath}");
-                }
+                        // Save decompressed file
+                        await File.WriteAllBytesAsync(decompressedPath, decompressedData, cts.Token);
+
+                        // Calculate and display compression ratio
+                        double ratio = helper.CalculateRatio(size, decompressedSize);
+                        this.Invoke(new Action(() =>
+                        {
+                            lblResults.Text = $"Compressed: {size} bytes\n" +
+                                        $"Decompressed: {decompressedSize} bytes\n" +
+                                        $"Compression ratio: {ratio:F2}%";
+
+                            MessageBox.Show($"File decompressed successfully!\nSaved as: {decompressedPath}");
+                        }));
+                    }
+                });
             }
             catch (OperationCanceledException)
             {
                 lblStatus.Text = "Decompression canceled";
+                // Clean up partial output file if it exists
+                if (File.Exists(decompressedPath))
+                {
+                    try { File.Delete(decompressedPath); }
+                    catch { /* Ignore deletion errors */ }
+                }
+                else if (Directory.Exists(decompressedPath))
+                {
+                    try { Directory.Delete(decompressedPath, true); }
+                    catch { /* Ignore deletion errors */ }
+                }
+                else { }
                 MessageBox.Show("Decompression was canceled.");
             }
             catch (Exception ex)
@@ -265,72 +261,60 @@ namespace Compression
             }
             finally
             {
-                // Wait a moment for operations to complete
                 await Task.Delay(100);
-
-                // Reset UI
-                LockUnlockBtn(true);
-
-                // lock buttons
-                btnCancel.Enabled = false;
-                btnPause.Enabled = false;
-                btnResume.Enabled = false;
-
-                progressBar.Value = 0;
-                lblStatus.Text = "Ready";
-                lblResults.Text = string.Empty;
-
-                //// Clean up resources
-                //pauseEvent?.Set();
-                //cts?.Dispose();
-                //pauseEvent?.Dispose();
-
-                // reset event
-                pauseEvent?.Dispose();
-                pauseEvent = new ManualResetEventSlim(true);
-                // reset cts
-                cts?.Dispose();
-                cts = new CancellationTokenSource();
+                ResetUI();
             }
-        }
-
-        private void btnCancel_Click(object sender, EventArgs e)
-        {
-            MessageBox.Show($"Cancel {lblStatus.Text}");
-            lblResults.Text = cts.ToString();
-            if (cts != null && !cts.IsCancellationRequested)
-            {
-                cts.Cancel();
-            }
-            else {
-                lblResults.Text = "GG CTS";
-            }
-            btnCancel.Enabled = false;
         }
 
         private void btnPause_Click(object sender, EventArgs e)
         {
-            pauseEvent.Reset();
-            isPaused = true;
+            this.BeginInvoke(new Action(() =>
+            {
+                if (isPaused) return;
 
-            btnPause.Enabled = false;
-            btnResume.Enabled = true;
-            lblStatus.Text = "Paused...";
+                pauseEvent.Reset();
+                isPaused = true;
+
+                btnPause.Enabled = false;
+                btnResume.Enabled = true;
+            }));
         }
 
         private void btnResume_Click(object sender, EventArgs e)
         {
-            pauseEvent.Set();
-            isPaused = false;
+            this.BeginInvoke(new Action(() =>
+            {
+                if (!isPaused) return;
 
-            btnResume.Enabled = false;
-            btnPause.Enabled = true;
-            lblStatus.Text = "Resumed...";
+                pauseEvent.Set();
+                isPaused = false;
+
+                btnPause.Enabled = true;
+                btnResume.Enabled = false;
+            }));
         }
 
-        private void MainForm_Load_1(object sender, EventArgs e)
+        private void btnCancel_Click(object sender, EventArgs e)
         {
+            this.BeginInvoke(new Action(() =>
+            {
+                cts?.Cancel();
+                btnCancel.Enabled = false;
+                lblStatus.Text = "Cancelling...";
+            }));
+        }
 
+        private void ResetPauseEvent()
+        {
+            isPaused = false;
+            pauseEvent?.Dispose();
+            pauseEvent = new ManualResetEventSlim(true);
+        }
+
+        private void ResetCancellationToken()
+        {
+            cts?.Dispose();
+            cts = new CancellationTokenSource();
         }
 
         private void LockUnlockBtn(bool unlock = false)
@@ -341,6 +325,33 @@ namespace Compression
             ShannonDecompress.Enabled = unlock;
             HuffmanCompress.Enabled = unlock;
             HuffmanDecompress.Enabled = unlock;
+        }
+
+        private void LockPauseResumeCancel()
+        {
+            btnCancel.Enabled = false;
+            btnPause.Enabled = false;
+            btnResume.Enabled = false;
+        }
+
+        private void UnLockPauseCancel()
+        {
+            btnPause.Enabled = true;
+            btnCancel.Enabled = true;
+            btnResume.Enabled = false;
+        }
+
+        private void ResetUI()
+        {
+            ResetPauseEvent();
+            ResetCancellationToken();
+
+            LockUnlockBtn(true);
+            LockPauseResumeCancel();
+
+            progressBar.Value = 0;
+            lblStatus.Text = "Ready";
+            lblResults.Text = string.Empty;
         }
     }
 }

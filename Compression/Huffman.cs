@@ -1,11 +1,11 @@
 ﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Collections.Concurrent;
 
 namespace Compression
 {
@@ -20,9 +20,8 @@ namespace Compression
             this.pauseEvent = pauseEvent;
         }
 
-        public async Task CompressDirectory(List<(string FullPath, string RelativePath)> files, string distPath, string dirName, IProgress<int> progress = null, CancellationToken cancellationToken = default)
+        public async Task CompressDirectory(List<(string FullPath, string RelativePath)> files, string outputPath, IProgress<int> progress = null, CancellationToken cancellationToken = default)
         {
-            string outputPath = Path.Combine(distPath, dirName + "-compressed.huff");
             using (var fs = new FileStream(outputPath, FileMode.Create))
             using (var writer = new BinaryWriter(fs))
             {
@@ -50,23 +49,19 @@ namespace Compression
                         byte[] compressedData = await CompressFile(data, ext, progress, ct);
                         compressedFiles.TryAdd(file.RelativePath, compressedData);
 
+                        // Update progressBar
                         Interlocked.Increment(ref processedFiles);
                         progress?.Report((int)((double)processedFiles / files.Count * 100));
+                        //await Task.Delay(1, cancellationToken); // Let UI process
                     }
-                    //catch (OperationCanceledException)
-                    //{
-                    //    // Clean up partial output file if it exists
-                    //    compressedFiles.Clear();
-                    //    if (File.Exists(outputPath))
-                    //    {
-                    //        try { File.Delete(outputPath); }
-                    //        catch { /* Ignore deletion errors */ }
-                    //    }
-                    //    throw;
-                    //}
-                    catch (Exception ex)
+                    catch (OperationCanceledException)
                     {
-                        Console.Error.WriteLine($"Error compressing {file.FullPath}: {ex.Message}");
+                        compressedFiles.Clear();
+                        throw;
+                    }
+                    catch (Exception e)
+                    {
+                        Console.Error.WriteLine($"Error compressing {file.FullPath}: {e.Message}");
                     }
                 });
 
@@ -98,9 +93,10 @@ namespace Compression
                 var fileEntries = new List<(string RelativePath, long OriginalSize)>();
                 for (int i = 0; i < fileCount; i++)
                 {
+                    // Pause or Cancel
                     pauseEvent.Wait(cancellationToken); // Wait if paused
                     cancellationToken.ThrowIfCancellationRequested();
-
+                    //
                     short pathLength = reader.ReadInt16();
                     string relativePath = Encoding.UTF8.GetString(reader.ReadBytes(pathLength));
                     long originalSize = reader.ReadInt64();
@@ -112,19 +108,24 @@ namespace Compression
                 // {
                 foreach (var entry in fileEntries)
                 {
+                    // Pause or Cancel
                     pauseEvent.Wait(cancellationToken); // Wait if paused
                     cancellationToken.ThrowIfCancellationRequested();
-
+                    //
                     int fileSize = reader.ReadInt32();
                     byte[] fileData = reader.ReadBytes(fileSize);
 
-                    var (data, _) = DecompressFile(fileData, progress, cancellationToken);
+                    var (data, _) = await DecompressFile(fileData, progress, cancellationToken);
                     string outputPath = Path.Combine(dirPath, entry.RelativePath);
                     Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
-                    await File.WriteAllBytesAsync(outputPath, data);
 
+                    // Write file
+                    await File.WriteAllBytesAsync(outputPath, data, cancellationToken);
+
+                    // Update progressBar
                     Interlocked.Increment(ref processedFiles);
                     progress?.Report((int)(processedFiles / fileCount * 100));
+                    //await Task.Delay(1, cancellationToken); // Let UI process
                 //});
                 }
             }
@@ -162,8 +163,6 @@ namespace Compression
                 long totalBits = 0;
                 foreach (byte b in data)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-
                     totalBits += codes[b].Length;
                 }
                 writer.Write(totalBits);
@@ -172,21 +171,25 @@ namespace Compression
                 int processedBytes = 0;
                 foreach (byte b in data)
                 {
+                    // Pause or Cancel
                     pauseEvent.Wait(cancellationToken); // Wait if paused
                     cancellationToken.ThrowIfCancellationRequested();
-
+                    //
                     string code = codes[b];
                     foreach (char bit in code)
                     {
+                        // Cancel
                         cancellationToken.ThrowIfCancellationRequested();
-
+                        //
                         bitWriter.WriteBit(bit == '1');
                     }
 
                     processedBytes++;
                     if (processedBytes % 1000 == 0) // Report progress every 1000 bytes
                     {
+                        // Update progressBar
                         progress?.Report((int)((double)processedBytes / data.Length * 100));
+                        //await Task.Delay(1, cancellationToken); // Let UI process
                     }
                 }
 
@@ -195,7 +198,7 @@ namespace Compression
             }
         }
 
-        public (byte[] data, string ext) DecompressFile(byte[] compressedData, IProgress<int> progress = null, CancellationToken cancellationToken = default)
+        public async Task<(byte[] data, string ext)> DecompressFile(byte[] compressedData, IProgress<int> progress = null, CancellationToken cancellationToken = default)
         {
             if (compressedData == null || compressedData.Length == 0)
                 return (new byte[0], null);
@@ -227,16 +230,16 @@ namespace Compression
 
                 while (bitsRead < totalBits)
                 {
-                    // Pause
+                    // Pause or Cancel
                     pauseEvent.Wait(cancellationToken); // Wait if paused
-
-
                     cancellationToken.ThrowIfCancellationRequested();
-
+                    //
                     var node = root;
                     while (!node.IsLeaf())
                     {
+                        // Cancel
                         cancellationToken.ThrowIfCancellationRequested();
+                        //
 
                         bool? bit = bitReader.ReadBit();
                         if (bit == null) break;
@@ -252,7 +255,9 @@ namespace Compression
 
                     if (bitsRead % 1000 == 0) // Report progress every 1000 bits
                     {
+                        // Update progressBar
                         progress?.Report((int)((double)bitsRead / totalBits * 100));
+                        //await Task.Delay(1, cancellationToken); // Let UI process
                     }
                 }
 
