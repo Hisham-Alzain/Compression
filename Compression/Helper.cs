@@ -54,5 +54,10 @@ namespace Compression
             }
             return frequencies;
         }
+
+        public double CalculateRatio(long compressedSize, long decompressedSize)
+        {
+            return (double)compressedSize / (double)decompressedSize * 100;
+        }
     }
 }

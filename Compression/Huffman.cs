@@ -12,14 +12,15 @@ namespace Compression
     public class Huffman
     {
         private readonly Helper helper;
-        private int bufferSize = 1024 * 1024;
+        private readonly ManualResetEventSlim pauseEvent;
 
-        public Huffman()
+        public Huffman(ManualResetEventSlim pauseEvent)
         {
-            helper = new Helper();
+            this.helper = new Helper();
+            this.pauseEvent = pauseEvent;
         }
 
-        public async Task CompressDirectory(List<(string FullPath, string RelativePath)> files, string distPath, string dirName, IProgress<int> progress = null)
+        public async Task CompressDirectory(List<(string FullPath, string RelativePath)> files, string distPath, string dirName, IProgress<int> progress = null, CancellationToken cancellationToken = default)
         {
             string outputPath = Path.Combine(distPath, dirName + "-compressed.huff");
             using (var fs = new FileStream(outputPath, FileMode.Create))
@@ -39,17 +40,30 @@ namespace Compression
                 var compressedFiles = new ConcurrentDictionary<string, byte[]>();
                 int processedFiles = 0;
 
-                await Parallel.ForEachAsync(files, async (file, cancellationToken) =>
+                await Parallel.ForEachAsync(files, cancellationToken, async (file, ct) =>
                 {
+                    pauseEvent.Wait(ct); // Wait if paused
+
                     try
                     {
                         var (data, ext, size) = await helper.Readfile(file.FullPath);
-                        byte[] compressedData = await CompressFile(data, ext, progress);
+                        byte[] compressedData = await CompressFile(data, ext, progress, ct);
                         compressedFiles.TryAdd(file.RelativePath, compressedData);
 
                         Interlocked.Increment(ref processedFiles);
                         progress?.Report((int)((double)processedFiles / files.Count * 100));
                     }
+                    //catch (OperationCanceledException)
+                    //{
+                    //    // Clean up partial output file if it exists
+                    //    compressedFiles.Clear();
+                    //    if (File.Exists(outputPath))
+                    //    {
+                    //        try { File.Delete(outputPath); }
+                    //        catch { /* Ignore deletion errors */ }
+                    //    }
+                    //    throw;
+                    //}
                     catch (Exception ex)
                     {
                         Console.Error.WriteLine($"Error compressing {file.FullPath}: {ex.Message}");
@@ -67,7 +81,7 @@ namespace Compression
             }
         }
 
-        public async Task DecompressDirectory(byte[] compressedData, string dirPath, IProgress<int> progress = null)
+        public async Task DecompressDirectory(byte[] compressedData, string dirPath, IProgress<int> progress = null, CancellationToken cancellationToken = default)
         {
             if (compressedData == null || compressedData.Length == 0)
                 return;
@@ -84,6 +98,9 @@ namespace Compression
                 var fileEntries = new List<(string RelativePath, long OriginalSize)>();
                 for (int i = 0; i < fileCount; i++)
                 {
+                    pauseEvent.Wait(cancellationToken); // Wait if paused
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     short pathLength = reader.ReadInt16();
                     string relativePath = Encoding.UTF8.GetString(reader.ReadBytes(pathLength));
                     long originalSize = reader.ReadInt64();
@@ -95,10 +112,13 @@ namespace Compression
                 // {
                 foreach (var entry in fileEntries)
                 {
+                    pauseEvent.Wait(cancellationToken); // Wait if paused
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     int fileSize = reader.ReadInt32();
                     byte[] fileData = reader.ReadBytes(fileSize);
 
-                    var (data, _) = DecompressFile(fileData, progress);
+                    var (data, _) = DecompressFile(fileData, progress, cancellationToken);
                     string outputPath = Path.Combine(dirPath, entry.RelativePath);
                     Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
                     await File.WriteAllBytesAsync(outputPath, data);
@@ -110,7 +130,7 @@ namespace Compression
             }
         }
 
-        public async Task<byte[]> CompressFile(byte[] data, string ext, IProgress<int> progress = null)
+        public async Task<byte[]> CompressFile(byte[] data, string ext, IProgress<int> progress = null, CancellationToken cancellationToken = default)
         {
             if (data == null || data.Length == 0)
                 return new byte[0];
@@ -142,6 +162,8 @@ namespace Compression
                 long totalBits = 0;
                 foreach (byte b in data)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     totalBits += codes[b].Length;
                 }
                 writer.Write(totalBits);
@@ -150,9 +172,14 @@ namespace Compression
                 int processedBytes = 0;
                 foreach (byte b in data)
                 {
+                    pauseEvent.Wait(cancellationToken); // Wait if paused
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     string code = codes[b];
                     foreach (char bit in code)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
+
                         bitWriter.WriteBit(bit == '1');
                     }
 
@@ -163,15 +190,12 @@ namespace Compression
                     }
                 }
 
-                // remember to flush
                 bitWriter.Flush();
-
-                // return data
                 return ms.ToArray();
             }
         }
 
-        public (byte[] data, string ext) DecompressFile(byte[] compressedData, IProgress<int> progress = null)
+        public (byte[] data, string ext) DecompressFile(byte[] compressedData, IProgress<int> progress = null, CancellationToken cancellationToken = default)
         {
             if (compressedData == null || compressedData.Length == 0)
                 return (new byte[0], null);
@@ -203,9 +227,17 @@ namespace Compression
 
                 while (bitsRead < totalBits)
                 {
+                    // Pause
+                    pauseEvent.Wait(cancellationToken); // Wait if paused
+
+
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     var node = root;
                     while (!node.IsLeaf())
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
+
                         bool? bit = bitReader.ReadBit();
                         if (bit == null) break;
 

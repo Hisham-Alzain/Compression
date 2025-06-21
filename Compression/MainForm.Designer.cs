@@ -24,6 +24,11 @@
             this.HuffmanLabel = new System.Windows.Forms.Label();
             this.HuffmanCompress = new System.Windows.Forms.Button();
             this.HuffmanDecompress = new System.Windows.Forms.Button();
+
+            this.btnCancel = new System.Windows.Forms.Button();
+            this.btnPause = new System.Windows.Forms.Button();
+            this.btnResume = new System.Windows.Forms.Button();
+
             this.lblResults = new System.Windows.Forms.Label();
             this.lblStatus = new System.Windows.Forms.Label();
             this.label1 = new System.Windows.Forms.Label();
@@ -122,6 +127,44 @@
             this.HuffmanDecompress.Text = "Decompress";
             this.HuffmanDecompress.UseVisualStyleBackColor = true;
             this.HuffmanDecompress.Click += new System.EventHandler(this.HuffmanDecompress_Click);
+
+            // 
+            // btnCancel
+            // 
+            this.btnCancel.Enabled = false;
+            this.btnCancel.Location = new System.Drawing.Point(573, 424);
+            this.btnCancel.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.btnCancel.Name = "btnCancel";
+            this.btnCancel.Size = new System.Drawing.Size(160, 46);
+            this.btnCancel.TabIndex = 7;
+            this.btnCancel.Text = "Cancel";
+            this.btnCancel.UseVisualStyleBackColor = true;
+            this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
+            // 
+            // btnPause
+            // 
+            this.btnPause.Enabled = false;
+            this.btnPause.Location = new System.Drawing.Point(235, 424);
+            this.btnPause.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.btnPause.Name = "btnPause";
+            this.btnPause.Size = new System.Drawing.Size(160, 46);
+            this.btnPause.TabIndex = 8;
+            this.btnPause.Text = "Pause";
+            this.btnPause.UseVisualStyleBackColor = true;
+            this.btnPause.Click += new System.EventHandler(this.btnPause_Click);
+            // 
+            // btnResume
+            // 
+            this.btnResume.Enabled = false;
+            this.btnResume.Location = new System.Drawing.Point(405, 424);
+            this.btnResume.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.btnResume.Name = "btnResume";
+            this.btnResume.Size = new System.Drawing.Size(160, 46);
+            this.btnResume.TabIndex = 9;
+            this.btnResume.Text = "Resume";
+            this.btnResume.UseVisualStyleBackColor = true;
+            this.btnResume.Click += new System.EventHandler(this.btnResume_Click);
+
             // 
             // lblResults
             // 
@@ -135,7 +178,7 @@
             // lblStatus
             // 
             this.lblStatus.AutoSize = true;
-            this.lblStatus.Location = new System.Drawing.Point(16, 424);
+            this.lblStatus.Location = new System.Drawing.Point(16, 437);
             this.lblStatus.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(52, 20);
@@ -176,6 +219,11 @@
             this.Controls.Add(this.ShannonLabel);
             this.Controls.Add(this.HuffmanDecompress);
             this.Controls.Add(this.HuffmanCompress);
+
+            this.Controls.Add(this.btnResume);
+            this.Controls.Add(this.btnPause);
+            this.Controls.Add(this.btnCancel);
+
             this.Controls.Add(this.HuffmanLabel);
             this.Controls.Add(this.folderBrowse);
             this.Controls.Add(this.fileBrowse);
@@ -198,6 +246,11 @@
         private System.Windows.Forms.Label HuffmanLabel;
         private System.Windows.Forms.Button HuffmanCompress;
         private System.Windows.Forms.Button HuffmanDecompress;
+
+        private System.Windows.Forms.Button btnCancel;
+        private System.Windows.Forms.Button btnPause;
+        private System.Windows.Forms.Button btnResume;
+
         private System.Windows.Forms.Label lblResults;
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.Label label1;
