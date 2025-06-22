@@ -141,7 +141,7 @@ namespace Compression
                     {
                         if (current == code)
                         {
-                            result.Enqueue(reverseCodeTable[code]);
+                            //result.Enqueue(reverseCodeTable[code]);
                             current = "";
                             break;
                         }

@@ -24,6 +24,7 @@
             this.HuffmanLabel = new System.Windows.Forms.Label();
             this.HuffmanCompress = new System.Windows.Forms.Button();
             this.HuffmanDecompress = new System.Windows.Forms.Button();
+            this.HuffmanSelectiveDecompress = new System.Windows.Forms.Button();
             this.btnPause = new System.Windows.Forms.Button();
             this.btnResume = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
@@ -126,10 +127,21 @@
             this.HuffmanDecompress.UseVisualStyleBackColor = true;
             this.HuffmanDecompress.Click += new System.EventHandler(this.HuffmanDecompress_Click);
             // 
+            // HuffmanSelectiveDecompress
+            // 
+            this.HuffmanSelectiveDecompress.Location = new System.Drawing.Point(459, 210);
+            this.HuffmanSelectiveDecompress.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.HuffmanSelectiveDecompress.Name = "HuffmanSelectiveDecompress";
+            this.HuffmanSelectiveDecompress.Size = new System.Drawing.Size(220, 46);
+            this.HuffmanSelectiveDecompress.TabIndex = 3;
+            this.HuffmanSelectiveDecompress.Text = "Selective Decompress";
+            this.HuffmanSelectiveDecompress.UseVisualStyleBackColor = true;
+            this.HuffmanSelectiveDecompress.Click += new System.EventHandler(this.HuffmanSelectiveDecompress_Click);
+            // 
             // btnPause
             // 
             this.btnPause.Enabled = false;
-            this.btnPause.Location = new System.Drawing.Point(235, 424);
+            this.btnPause.Location = new System.Drawing.Point(235, 474);
             this.btnPause.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.btnPause.Name = "btnPause";
             this.btnPause.Size = new System.Drawing.Size(160, 46);
@@ -141,7 +153,7 @@
             // btnResume
             // 
             this.btnResume.Enabled = false;
-            this.btnResume.Location = new System.Drawing.Point(405, 424);
+            this.btnResume.Location = new System.Drawing.Point(405, 474);
             this.btnResume.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.btnResume.Name = "btnResume";
             this.btnResume.Size = new System.Drawing.Size(160, 46);
@@ -153,7 +165,7 @@
             // btnCancel
             // 
             this.btnCancel.Enabled = false;
-            this.btnCancel.Location = new System.Drawing.Point(573, 424);
+            this.btnCancel.Location = new System.Drawing.Point(573, 474);
             this.btnCancel.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(160, 46);
@@ -165,7 +177,7 @@
             // lblResults
             // 
             this.lblResults.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.lblResults.Location = new System.Drawing.Point(16, 232);
+            this.lblResults.Location = new System.Drawing.Point(16, 282);
             this.lblResults.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.lblResults.Name = "lblResults";
             this.lblResults.Size = new System.Drawing.Size(763, 122);
@@ -174,7 +186,7 @@
             // lblStatus
             // 
             this.lblStatus.AutoSize = true;
-            this.lblStatus.Location = new System.Drawing.Point(16, 437);
+            this.lblStatus.Location = new System.Drawing.Point(16, 487);
             this.lblStatus.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(209, 31);
@@ -194,7 +206,7 @@
             // progress bar
             //
             this.progressBar = new System.Windows.Forms.ProgressBar();
-            this.progressBar.Location = new System.Drawing.Point(16, 370);
+            this.progressBar.Location = new System.Drawing.Point(16, 420);
             this.progressBar.Size = new System.Drawing.Size(763, 30);
             this.progressBar.TabIndex = 6;
             this.progressBar.Minimum = 0;
@@ -216,6 +228,7 @@
             this.Controls.Add(this.ShannonDecompress);
             this.Controls.Add(this.ShannonCompress);
             this.Controls.Add(this.ShannonLabel);
+            this.Controls.Add(this.HuffmanSelectiveDecompress);
             this.Controls.Add(this.HuffmanDecompress);
             this.Controls.Add(this.HuffmanCompress);
             this.Controls.Add(this.HuffmanLabel);
@@ -240,6 +253,7 @@
         private System.Windows.Forms.Label HuffmanLabel;
         private System.Windows.Forms.Button HuffmanCompress;
         private System.Windows.Forms.Button HuffmanDecompress;
+        private System.Windows.Forms.Button HuffmanSelectiveDecompress;
         private System.Windows.Forms.Button btnPause;
         private System.Windows.Forms.Button btnResume;
         private System.Windows.Forms.Button btnCancel;

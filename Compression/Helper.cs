@@ -59,5 +59,46 @@ namespace Compression
         {
             return (double)compressedSize / (double)decompressedSize * 100;
         }
+
+
+        /// <summary>
+        /// Finds the longest common directory path shared by all input paths.
+        /// </summary>
+        /// <param name="paths">Array of file paths to analyze</param>
+        /// <returns>The common base directory path ending with directory separator, or empty string if no common path exists</returns>
+        public string GetCommonPath(string[] paths)
+        {
+            // Handle edge cases
+            if (paths.Length == 0)
+                return string.Empty;  // No paths provided
+
+            if (paths.Length == 1)
+                return Path.GetDirectoryName(paths[0]);  // Single path - return its directory
+
+            // Start with the directory of the first path as initial common path
+            // Example: if first path is "C:\Folder\Subfolder\file.txt"
+            // commonPath becomes "C:\Folder\Subfolder"
+            string commonPath = Path.GetDirectoryName(paths[0]);
+
+            // Compare with each subsequent path
+            for (int i = 1; i < paths.Length; i++)
+            {
+                // Keep moving up the directory tree until we find a match
+                while (!paths[i].StartsWith(commonPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Move up one directory level
+                    // Example: "C:\Folder\Subfolder" → "C:\Folder"
+                    commonPath = Path.GetDirectoryName(commonPath);
+
+                    // If we've reached the root and still no match
+                    if (commonPath == null)
+                        return string.Empty;  // No common path exists
+                }
+            }
+
+            // Ensure the path ends with a directory separator
+            // Example converts "C:\Folder" to "C:\Folder\"
+            return commonPath + Path.DirectorySeparatorChar;
+        }
     }
 }

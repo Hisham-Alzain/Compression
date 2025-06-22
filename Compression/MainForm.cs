@@ -31,9 +31,10 @@ namespace Compression
         {
             using (OpenFileDialog openFileDialog = new OpenFileDialog())
             {
+                openFileDialog.Multiselect = true;
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    txtPath.Text = openFileDialog.FileName;
+                    txtPath.Text = string.Join("|", openFileDialog.FileNames);
                 }
             }
         }
@@ -57,7 +58,7 @@ namespace Compression
         {
             if (string.IsNullOrEmpty(txtPath.Text))
             {
-                MessageBox.Show("Please select a valid file or folder.");
+                MessageBox.Show("Please select valid file(s) or folder.");
                 return;
             }
 
@@ -119,7 +120,7 @@ namespace Compression
                         compressedFilePath = Path.Combine(distPath, dirName + "-compressed.huff");
 
                         // Compress and save the data
-                        await compressor.CompressDirectory(files, compressedFilePath, progress, cts.Token);
+                        await compressor.CompressMultipleFiles(files, compressedFilePath, progress, cts.Token);
 
                         this.Invoke(new Action(() =>
                         {
@@ -128,10 +129,31 @@ namespace Compression
                     }
                     else
                     {
-                        this.Invoke(new Action(() =>
+                        // Handle multiple file selection
+                        var filePaths = txtPath.Text.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (filePaths.Length > 1)
                         {
-                            MessageBox.Show($"Error during compression: {null}");
-                        }));
+                            var files = new List<(string FullPath, string RelativePath)>();
+                            string commonPath = helper.GetCommonPath(filePaths);
+
+                            foreach (var filePath in filePaths)
+                            {
+                                string relativePath = filePath.Substring(commonPath.Length).TrimStart(Path.DirectorySeparatorChar);
+                                files.Add((filePath, relativePath));
+                            }
+
+                            // Prepare compressed path
+                            string compressedName = $"{filePaths[0]}-multi-compressed.huff";
+                            compressedFilePath = Path.Combine(Path.GetDirectoryName(commonPath), compressedName);
+
+                            // Compress and save the files
+                            await compressor.CompressMultipleFiles(files, compressedFilePath, progress, cts.Token);
+
+                            this.Invoke(new Action(() =>
+                            {
+                                MessageBox.Show($"{files.Count} files compressed successfully!\nSaved as: {compressedFilePath}");
+                            }));
+                        }
                     }
                 });
             }
@@ -174,7 +196,7 @@ namespace Compression
             string decompressedPath = "";
             try
             {
-                bool is_dir;
+                bool isMultiFile;
                 LockUnlockBtn(false);
                 progressBar.Value = 0;
                 lblStatus.Text = "Starting decompression...";
@@ -198,16 +220,16 @@ namespace Compression
                     using (var reader = new BinaryReader(ms))
                     {
                         // Read header
-                        is_dir = reader.ReadBoolean();
+                        isMultiFile = reader.ReadBoolean();
                     }
 
-                    if (is_dir) 
+                    if (isMultiFile) 
                     {
                         // Prepare decompressed path
                         decompressedPath = txtPath.Text.Replace("-compressed", "-decompressed").Replace(".huff", "");
 
                         // Decompress and save the data
-                        await decompressor.DecompressDirectory(data, decompressedPath, progress, cts.Token);
+                        await decompressor.DecompressMultipleFiles(data, decompressedPath, progress, cts.Token);
                         this.Invoke(new Action(() =>
                         {
                             MessageBox.Show($"Folder decompressed successfully!\nSaved as: {decompressedPath}");
@@ -236,6 +258,102 @@ namespace Compression
                             MessageBox.Show($"File decompressed successfully!\nSaved as: {decompressedPath}");
                         }));
                     }
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                lblStatus.Text = "Decompression canceled";
+                // Clean up partial output file if it exists
+                if (File.Exists(decompressedPath))
+                {
+                    try { File.Delete(decompressedPath); }
+                    catch { /* Ignore deletion errors */ }
+                }
+                else if (Directory.Exists(decompressedPath))
+                {
+                    try { Directory.Delete(decompressedPath, true); }
+                    catch { /* Ignore deletion errors */ }
+                }
+                else { }
+                MessageBox.Show("Decompression was canceled.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error during decompression: {ex.Message}");
+            }
+            finally
+            {
+                await Task.Delay(100);
+                ResetUI();
+            }
+        }
+
+        private async void HuffmanSelectiveDecompress_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(txtPath.Text) || !File.Exists(txtPath.Text))
+            {
+                MessageBox.Show("Please select a valid file first.");
+                return;
+            }
+
+            if (!txtPath.Text.EndsWith(".huff"))
+            {
+                MessageBox.Show("Please select a .huff compressed file.");
+                return;
+            }
+
+            string decompressedPath = "";
+            try
+            {
+                // Read the compressed file to get file list
+                var (data, _, _) = await helper.Readfile(txtPath.Text);
+
+                //
+                ResetPauseEvent();
+                ResetCancellationToken();
+                Huffman decompressor = new Huffman(pauseEvent);
+                var fileList = await decompressor.GetCompressedFileList(data);
+                //
+
+                // Show file selection dialog
+                var selectionForm = new FileSelectionForm(fileList.Select(f => f.RelativePath).ToList());
+                if (selectionForm.ShowDialog() != DialogResult.OK ||
+                    !selectionForm.SelectedFiles.Any())
+                {
+                    return;
+                }
+
+                // decompress
+                LockUnlockBtn(false);
+                progressBar.Value = 0;
+                lblStatus.Text = "Starting selective decompression...";
+                var progress = new Progress<int>(percent =>
+                {
+                    progressBar.Value = percent;
+                    lblStatus.Text = isPaused ? $"Paused... {percent}%" : $"Decompressing... {percent}%";
+                });
+                UnLockPauseCancel();
+
+                ResetPauseEvent();
+                ResetCancellationToken();
+                decompressor = new Huffman(pauseEvent);
+
+                //string decompressedPath = Path.Combine(
+                //    Path.GetDirectoryName(txtPath.Text),
+                //    Path.GetFileNameWithoutExtension(txtPath.Text) + "-decompressed");
+
+                await Task.Run(async () =>
+                {
+                    // Prepare decompressed path
+                    decompressedPath = txtPath.Text.Replace("-compressed", "-decompressed").Replace(".huff", "");
+
+                    // Decompress and save the data
+                    await decompressor.DecompressSelectedFiles(data, decompressedPath, selectionForm.SelectedFiles, progress, cts.Token);
+
+                    this.Invoke(new Action(() =>
+                    {
+                        MessageBox.Show($"{selectionForm.SelectedFiles.Count} files decompressed successfully!\nSaved to: {decompressedPath}");
+                    }));
                 });
             }
             catch (OperationCanceledException)
