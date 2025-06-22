@@ -57,7 +57,10 @@ namespace Compression
 
         public double CalculateRatio(long compressedSize, long decompressedSize)
         {
-            return (double)compressedSize / (double)decompressedSize * 100;
+            if (decompressedSize == 0)
+                return 0; // Prevent division by zero
+
+            return (1 - ((double)compressedSize / (double)decompressedSize)) * 100;
         }
 
 

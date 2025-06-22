@@ -11,36 +11,375 @@ namespace Compression
 {
     public class ShannonFano
     {
-        private Helper helper;
-        private const int BUFFER_SIZE = 4096;
-        private const int DIRECTORY_HEADER_MARKER = 0x44495243; // "DIRC"
+        private readonly Helper helper;
+        private readonly ManualResetEventSlim pauseEvent;
 
-        public ShannonFano()
+        public ShannonFano(ManualResetEventSlim pauseEvent)
         {
-            helper = new Helper();
+            this.helper = new Helper();
+            this.pauseEvent = pauseEvent;
         }
+
+        public async Task CompressMultipleFiles(List<(string FullPath, string RelativePath)> files, string outputPath, IProgress<int> progress = null, CancellationToken cancellationToken = default)
+        {
+            using (var fs = new FileStream(outputPath, FileMode.Create))
+            using (var writer = new BinaryWriter(fs))
+            {
+                writer.Write(true); // Is multi-file archive (not necessarily a directory)
+                writer.Write(files.Count);
+
+                foreach (var file in files)
+                {
+                    // Encode the string relative path in bytes
+                    byte[] pathBytes = Encoding.UTF8.GetBytes(file.RelativePath);
+                    writer.Write((short)pathBytes.Length);
+                    writer.Write(pathBytes);
+
+                    // Get the file metadata and store its size
+                    writer.Write(new FileInfo(file.FullPath).Length);
+                }
+
+                var compressedFiles = new ConcurrentDictionary<string, byte[]>();
+                int processedFiles = 0;
+
+                await Parallel.ForEachAsync(files, cancellationToken, async (file, ct) =>
+                {
+                    pauseEvent.Wait(ct); // Wait if paused
+
+                    try
+                    {
+                        var (data, ext, size) = await helper.Readfile(file.FullPath);
+                        byte[] compressedData = await Compress(data, ext, progress, ct);
+                        compressedFiles.TryAdd(file.RelativePath, compressedData);
+
+                        // Update progressBar
+                        Interlocked.Increment(ref processedFiles);
+                        progress?.Report((int)((double)processedFiles / files.Count * 100));
+                        //await Task.Delay(1, cancellationToken); // Let UI process
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        compressedFiles.Clear();
+                        throw;
+                    }
+                    catch (Exception e)
+                    {
+                        Console.Error.WriteLine($"Error compressing {file.FullPath}: {e.Message}");
+                    }
+                });
+
+                // Write compressed data
+                foreach (var file in files)
+                {
+                    if (compressedFiles.TryGetValue(file.RelativePath, out var data))
+                    {
+                        writer.Write(data.Length);
+                        writer.Write(data);
+                    }
+                }
+            }
+        }
+
+
 
         // Single file compression (updated to use in-memory)
-        public async Task Compress(string inputFile, string outputFile, IProgress<int> progress = null)
+
+        public async Task<byte[]> Compress(byte[] data, string ext, IProgress<int> progress = null, CancellationToken cancellationToken = default)
         {
-            byte[] data = File.ReadAllBytes(inputFile);
-            byte[] compressedData = await CompressBytesAsync(data, Path.GetExtension(inputFile), progress);
-            File.WriteAllBytes(outputFile, compressedData);
+            if (data == null || data.Length == 0)
+                return new byte[0];
+
+            Dictionary<byte, int> frequencies = await helper.CalculateFrequencies(data);
+            var root = BuildShannonFanoTree(frequencies);
+
+            var codes = new Dictionary<byte, string>();
+            GenerateCodes(root, "", codes);
+
+            using (var ms = new MemoryStream())
+            using (var writer = new BinaryWriter(ms))
+            {
+                var bitWriter = new BitWriter(writer);
+
+                // Write header info
+                writer.Write(false); // Not a directory
+                writer.Write((byte)ext.Length);
+                writer.Write(ext.ToCharArray());
+                writer.Write(frequencies.Count);
+                foreach (var pair in frequencies)
+                {
+                    writer.Write(pair.Key);
+                    writer.Write(pair.Value);
+                }
+
+                // Calculate and write total bits needed
+                long totalBits = data.Sum(b => codes[b].Length);
+                writer.Write(totalBits);
+
+                // Write compressed data
+                int processedBytes = 0;
+                foreach (byte b in data)
+                {
+                    pauseEvent.Wait(cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    foreach (char bit in codes[b])
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        bitWriter.WriteBit(bit == '1');
+                    }
+
+                    processedBytes++;
+                    if (processedBytes % 1000 == 0)
+                    {
+                        progress?.Report((int)((double)processedBytes / data.Length * 100));
+                    }
+                }
+
+                bitWriter.Flush();
+                return ms.ToArray();
+            }
         }
 
-        // Single file decompression (updated to use in-memory)
-        public void Decompress(string inputFile, string outputFile, IProgress<int> progress = null)
+
+        public async Task<List<(string RelativePath, long OriginalSize)>> GetCompressedFileList(byte[] compressedData)
         {
-            byte[] compressedData = File.ReadAllBytes(inputFile);
-            var (data, extension) = DecompressBytes(compressedData, progress);
+            using (var ms = new MemoryStream(compressedData))
+            using (var reader = new BinaryReader(ms))
+            {
+                bool isMultiFile = reader.ReadBoolean();
+                if (!isMultiFile) return new List<(string, long)>();
 
-            string finalOutput = string.IsNullOrEmpty(Path.GetExtension(outputFile))
-                ? Path.ChangeExtension(outputFile, extension)
-                : outputFile;
+                int fileCount = reader.ReadInt32();
+                var fileList = new List<(string, long)>(fileCount);
 
-            File.WriteAllBytes(finalOutput, data);
+                for (int i = 0; i < fileCount; i++)
+                {
+                    // Read the stored bytes length
+                    short pathLength = reader.ReadInt16();
+
+                    // Read the bytes and decode it back to string (relative path)
+                    string relativePath = Encoding.UTF8.GetString(reader.ReadBytes(pathLength));
+
+                    // Get stored size
+                    long originalSize = reader.ReadInt64();
+
+                    // Add the file to list
+                    fileList.Add((relativePath, originalSize));
+                }
+
+                return fileList;
+            }
         }
 
+        public async Task DecompressSelectedFiles(byte[] compressedData, string outputDir,
+        List<string> filesToExtract, IProgress<int> progress = null,
+        CancellationToken cancellationToken = default)
+        {
+            if (compressedData == null || compressedData.Length == 0)
+                return;
+
+            if (filesToExtract == null || filesToExtract.Count == 0)
+                return; // Nothing to extract
+
+            using (var ms = new MemoryStream(compressedData))
+            using (var reader = new BinaryReader(ms))
+            {
+                bool isMultiFile = reader.ReadBoolean();
+                if (!isMultiFile) return;
+
+                int fileCount = reader.ReadInt32();
+                var fileEntries = new List<(string Path, long Size, int Offset, int Length)>();
+
+                // Read file index
+                for (int i = 0; i < fileCount; i++)
+                {
+                    // Pause or Cancel
+                    pauseEvent.Wait(cancellationToken); // Wait if paused
+                    cancellationToken.ThrowIfCancellationRequested();
+                    //
+
+                    // Read the stored bytes length
+                    short pathLength = reader.ReadInt16();
+
+                    // Read the bytes and decode it back to string (relative path)
+                    string relativePath = Encoding.UTF8.GetString(reader.ReadBytes(pathLength));
+
+                    // Get stored size
+                    long originalSize = reader.ReadInt64();
+
+                    // Add the file to list
+                    fileEntries.Add((relativePath, originalSize, 0, 0));
+                }
+
+                // Read data offsets
+                for (int i = 0; i < fileCount; i++)
+                {
+                    // Read the compressed data length
+                    int dataLength = reader.ReadInt32();
+
+                    // Update data offset 
+                    var entry = fileEntries[i];
+                    fileEntries[i] = (entry.Path, entry.Size, (int)ms.Position, dataLength);
+                    ms.Seek(dataLength, SeekOrigin.Current);
+                }
+
+                // Process selected files
+                int processedFiles = 0;
+                foreach (var entry in fileEntries)
+                {
+                    // Check if file is to be extracted 
+                    if (!filesToExtract.Contains(entry.Path)) continue;
+
+                    // Pause or Cancel
+                    pauseEvent.Wait(cancellationToken); // Wait if paused
+                    cancellationToken.ThrowIfCancellationRequested();
+                    //
+
+                    ms.Seek(entry.Offset, SeekOrigin.Begin);
+                    byte[] fileData = reader.ReadBytes(entry.Length);
+
+                    var (data, _) = await Decompress(fileData, progress, cancellationToken);
+                    string outputPath = Path.Combine(outputDir, entry.Path);
+                    Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+
+                    // Write file
+                    await File.WriteAllBytesAsync(outputPath, data, cancellationToken);
+
+                    processedFiles++;
+                    progress?.Report((int)((double)processedFiles / filesToExtract.Count * 100));
+                }
+            }
+        }
+
+        public async Task DecompressMultipleFiles(byte[] compressedData, string dirPath, IProgress<int> progress = null, CancellationToken cancellationToken = default)
+        {
+            if (compressedData == null || compressedData.Length == 0)
+                return;
+
+            using (var ms = new MemoryStream(compressedData))
+            using (var reader = new BinaryReader(ms))
+            {
+                bool isMultiFile = reader.ReadBoolean();
+                if (!isMultiFile) return;
+
+                Directory.CreateDirectory(dirPath);
+                int fileCount = reader.ReadInt32();
+
+                var fileEntries = new List<(string RelativePath, long OriginalSize)>();
+                for (int i = 0; i < fileCount; i++)
+                {
+                    // Pause or Cancel
+                    pauseEvent.Wait(cancellationToken); // Wait if paused
+                    cancellationToken.ThrowIfCancellationRequested();
+                    //
+
+                    // Read the stored bytes length
+                    short pathLength = reader.ReadInt16();
+
+                    // Read the bytes and decode it back to string (relative path)
+                    string relativePath = Encoding.UTF8.GetString(reader.ReadBytes(pathLength));
+
+                    // Get stored size
+                    long originalSize = reader.ReadInt64();
+
+                    // Add the file to list
+                    fileEntries.Add((relativePath, originalSize));
+                }
+
+                int processedFiles = 0;
+                // await Parallel.ForEachAsync(fileEntries, async (entry, cancellationToken) =>
+                // {
+                foreach (var entry in fileEntries)
+                {
+                    // Pause or Cancel
+                    pauseEvent.Wait(cancellationToken); // Wait if paused
+                    cancellationToken.ThrowIfCancellationRequested();
+                    //
+
+                    int fileSize = reader.ReadInt32();
+                    byte[] fileData = reader.ReadBytes(fileSize);
+
+                    var (data, _) = await Decompress(fileData, progress, cancellationToken);
+                    string outputPath = Path.Combine(dirPath, entry.RelativePath);
+                    Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+
+                    // Write file
+                    await File.WriteAllBytesAsync(outputPath, data, cancellationToken);
+
+                    // Update progressBar
+                    Interlocked.Increment(ref processedFiles);
+                    progress?.Report((int)((double)processedFiles / fileCount * 100));
+                    //await Task.Delay(1, cancellationToken); // Let UI process
+                    //});
+                }
+            }
+        }
+        public async Task<(byte[] data, string ext)> Decompress(byte[] compressedData, IProgress<int> progress = null, CancellationToken cancellationToken = default)
+        {
+            if (compressedData == null || compressedData.Length == 0)
+                return (new byte[0], null);
+
+            using (var ms = new MemoryStream(compressedData))
+            using (var reader = new BinaryReader(ms))
+            {
+                bool is_dir = reader.ReadBoolean();
+                if (is_dir) return (new byte[0], null);
+
+                byte extensionLength = reader.ReadByte();
+                string originalExtension = new string(reader.ReadChars(extensionLength));
+
+                int count = reader.ReadInt32();
+                var frequencies = new Dictionary<byte, int>();
+                for (int i = 0; i < count; i++)
+                {
+                    byte symbol = reader.ReadByte();
+                    int frequency = reader.ReadInt32();
+                    frequencies[symbol] = frequency;
+                }
+
+                long totalBits = reader.ReadInt64();
+                var root = BuildShannonFanoTree(frequencies);
+
+                var bitReader = new BitReader(reader);
+                var decompressedData = new List<byte>();
+                long bitsRead = 0;
+
+                while (bitsRead < totalBits)
+                {
+                    // Pause or Cancel
+                    pauseEvent.Wait(cancellationToken); // Wait if paused
+                    cancellationToken.ThrowIfCancellationRequested();
+                    //
+                    var node = root;
+                    while (!node.IsLeaf())
+                    {
+                        // Cancel
+                        cancellationToken.ThrowIfCancellationRequested();
+                        //
+
+                        bool? bit = bitReader.ReadBit();
+                        if (bit == null) break;
+
+                        bitsRead++;
+                        node = bit.Value ? node.Right : node.Left;
+                    }
+
+                    if (node.IsLeaf())
+                    {
+                        decompressedData.Add(node.Symbol);
+                    }
+
+                    if (bitsRead % 1000 == 0) // Report progress every 1000 bits
+                    {
+                        // Update progressBar
+                        progress?.Report((int)((double)bitsRead / totalBits * 100));
+                        //await Task.Delay(1, cancellationToken); // Let UI process
+                    }
+                }
+
+                return (decompressedData.ToArray(), originalExtension);
+            }
+        }
         // Main compression logic (returns compressed bytes)
         private async Task<byte[]> CompressBytesAsync(byte[] data, string originalExtension, IProgress<int> progress = null)
         {
@@ -152,112 +491,6 @@ namespace Compression
             }
         }
 
-        // Directory compression (parallel implementation)
-        public async Task CompressDirectory(string sourceDirectory, string outputFile, IProgress<int> progress = null)
-        {
-            var files = Directory.GetFiles(sourceDirectory, "*.*", SearchOption.AllDirectories)
-                .Select(f => (FullPath: f, RelativePath: Path.GetRelativePath(sourceDirectory, f)))
-                .ToList();
-
-            using (var fs = new FileStream(outputFile, FileMode.Create))
-            using (var writer = new BinaryWriter(fs))
-            {
-                // Write directory marker
-                writer.Write(DIRECTORY_HEADER_MARKER);
-
-                // Write root directory name
-                string rootName = Path.GetFileName(sourceDirectory);
-                writer.Write(rootName);
-                writer.Write(files.Count);
-
-                // Write file list
-                foreach (var file in files)
-                {
-                    byte[] pathBytes = Encoding.UTF8.GetBytes(file.RelativePath);
-                    writer.Write((short)pathBytes.Length);
-                    writer.Write(pathBytes);
-                    writer.Write(new FileInfo(file.FullPath).Length);
-                }
-
-                // Parallel compression
-                var compressedFiles = new ConcurrentDictionary<string, byte[]>();
-                int processed = 0;
-
-                await Parallel.ForEachAsync(files, async (file, token) =>
-                {
-                    byte[] data = File.ReadAllBytes(file.FullPath);
-                    string ext = Path.GetExtension(file.FullPath);
-                    byte[] compressed = await CompressBytesAsync(data, ext, progress);
-                    compressedFiles[file.RelativePath] = compressed;
-
-                    Interlocked.Increment(ref processed);
-                    progress?.Report(processed * 100 / files.Count);
-                });
-
-                // Write compressed data
-                foreach (var file in files)
-                {
-                    if (compressedFiles.TryGetValue(file.RelativePath, out byte[] data))
-                    {
-                        writer.Write(data.Length);
-                        writer.Write(data);
-                    }
-                }
-            }
-        }
-
-        // Directory decompression (parallel implementation)
-        public void DecompressDirectory(string inputFile, string outputDirectory, IProgress<int> progress = null)
-        {
-            using (var fs = new FileStream(inputFile, FileMode.Open))
-            using (var reader = new BinaryReader(fs))
-            {
-                // Verify marker
-                int marker = reader.ReadInt32();
-                if (marker != DIRECTORY_HEADER_MARKER)
-                    throw new InvalidDataException("Invalid directory archive");
-
-                // Read root name
-                string rootName = reader.ReadString();
-                string outputRoot = Path.Combine(outputDirectory, rootName);
-                Directory.CreateDirectory(outputRoot);
-
-                int fileCount = reader.ReadInt32();
-                var files = new List<(string Path, long Size)>();
-
-                // Read file list
-                for (int i = 0; i < fileCount; i++)
-                {
-                    short pathLen = reader.ReadInt16();
-                    string relPath = Encoding.UTF8.GetString(reader.ReadBytes(pathLen));
-                    long size = reader.ReadInt64();
-                    files.Add((relPath, size));
-                }
-
-                // Read compressed data
-                var compressedData = new Dictionary<string, byte[]>();
-                foreach (var file in files)
-                {
-                    int compSize = reader.ReadInt32();
-                    compressedData[file.Path] = reader.ReadBytes(compSize);
-                }
-
-                // Parallel decompression
-                int processed = 0;
-                Parallel.ForEach(files, file =>
-                {
-                    string outputPath = Path.Combine(outputRoot, file.Path);
-                    Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
-
-                    var (data, _) = DecompressBytes(compressedData[file.Path], progress);
-                    File.WriteAllBytes(outputPath, data);
-
-                    Interlocked.Increment(ref processed);
-                    progress?.Report(processed * 100 / files.Count);
-                });
-            }
-        }
-
         // Helper methods remain unchanged
         private static List<Node> CreateSymbol(Dictionary<byte, int> frequencies)
         {
@@ -271,12 +504,27 @@ namespace Compression
             .ToList();
         }
 
-        private static void BuildShannonFanoTree(List<Node> nodes, int start, int end)
+        private Node BuildShannonFanoTree(Dictionary<byte, int> frequencies)
         {
-            if (start >= end) return;
+            // Convert frequency dictionary to nodes and sort by frequency (descending)
+            var nodes = frequencies.Select(p => new Node
+            {
+                Symbol = p.Key,
+                Frequency = p.Value
+            }).OrderByDescending(n => n.Frequency).ToList();
+
+            return BuildShannonFanoTree(nodes, 0, nodes.Count - 1);
+        }
+
+        private Node BuildShannonFanoTree(List<Node> nodes, int start, int end)
+        {
+            if (start == end)
+            {
+                return nodes[start];
+            }
 
             int total = nodes.Skip(start).Take(end - start + 1).Sum(n => n.Frequency);
-            int sum1 = 0, sum2 = 0, split = start;
+            int sum1 = 0, sum2 = 0;
             int left = start, right = end;
 
             while (left <= right)
@@ -291,15 +539,43 @@ namespace Compression
                 }
             }
 
-            split = left - 1;
+            int split = left - 1;
 
-            for (int i = start; i <= end; i++)
+            // Recursively build subtrees
+            Node leftChild = BuildShannonFanoTree(nodes, start, split);
+            Node rightChild = BuildShannonFanoTree(nodes, split + 1, end);
+
+            return new Node
             {
-                nodes[i].Code += (i <= split) ? "1" : "0";
+                Frequency = leftChild.Frequency + rightChild.Frequency,
+                Left = leftChild,
+                Right = rightChild
+            };
+        }
+
+        private void GenerateCodes(Node node, string code, Dictionary<byte, string> codes)
+        {
+            if (node == null) return;
+
+            if (node.IsLeaf())
+            {
+                node.Code = code;
+                codes[node.Symbol] = code;
+                return;
             }
 
-            BuildShannonFanoTree(nodes, start, split);
-            BuildShannonFanoTree(nodes, split + 1, end);
+            GenerateCodes(node.Left, code + "0", codes);
+            GenerateCodes(node.Right, code + "1", codes);
+        }
+
+        public void Pause()
+        {
+            pauseEvent.Reset();
+        }
+
+        public void Resume()
+        {
+            pauseEvent.Set();
         }
     }
 }
