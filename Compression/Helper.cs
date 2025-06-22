@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 
 
 namespace Compression
@@ -102,6 +103,80 @@ namespace Compression
             // Ensure the path ends with a directory separator
             // Example converts "C:\Folder" to "C:\Folder\"
             return commonPath + Path.DirectorySeparatorChar;
+        }
+
+        public byte[] EncryptData(byte[] data, string password)
+        {
+            if (string.IsNullOrEmpty(password)) return data;
+
+            using (var aes = Aes.Create())
+            {
+                var key = new Rfc2898DeriveBytes(password,
+                    Encoding.UTF8.GetBytes("SALT_VALUE"), 10000); // Use a better salt
+                aes.Key = key.GetBytes(aes.KeySize / 8);
+                aes.IV = key.GetBytes(aes.BlockSize / 8);
+
+                using (var encryptor = aes.CreateEncryptor(aes.Key, aes.IV))
+                using (var ms = new MemoryStream())
+                {
+                    ms.Write(aes.IV, 0, aes.IV.Length); // Write IV first
+                    using (var cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
+                    {
+                        cs.Write(data, 0, data.Length);
+                        cs.FlushFinalBlock();
+                    }
+                    return ms.ToArray();
+                }
+            }
+        }
+
+        public byte[] DecryptData(byte[] encryptedData, string password)
+        {
+            if (string.IsNullOrEmpty(password)) return encryptedData;
+                
+            using (var aes = Aes.Create())
+            {
+                var key = new Rfc2898DeriveBytes(password,
+                    Encoding.UTF8.GetBytes("SALT_VALUE"), 10000); // Same salt as encryption
+
+                using (var ms = new MemoryStream(encryptedData))
+                {
+                    // Read IV first
+                    byte[] iv = new byte[aes.BlockSize / 8];
+                    ms.Read(iv, 0, iv.Length);
+
+                    aes.Key = key.GetBytes(aes.KeySize / 8);
+                    aes.IV = iv;
+
+                    using (var decryptor = aes.CreateDecryptor(aes.Key, aes.IV))
+                    using (var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read))
+                    using (var output = new MemoryStream())
+                    {
+                        cs.CopyTo(output);
+                        return output.ToArray();
+                    }
+                }
+            }
+        }
+
+        public bool IsPasswordProtected(string filePath)
+        {
+            try
+            {
+                // Read just the first few bytes to check for password protection marker
+                using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                using (var reader = new BinaryReader(fs))
+                {
+                    // Read the first byte which indicates password protection status
+                    bool isPasswordProtected = reader.ReadBoolean();
+                    return isPasswordProtected;
+                }
+            }
+            catch
+            {
+                // If we can't read the file, assume it's not password protected
+                return false;
+            }
         }
     }
 }

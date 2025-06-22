@@ -1,5 +1,5 @@
-﻿using Compression.Compression;
-using System;
+﻿using System;
+using System.Security.Cryptography;
 
 namespace Compression
 {
@@ -12,12 +12,11 @@ namespace Compression
         // Pause & Resume
         private ManualResetEventSlim pauseEvent;
         private bool isPaused = false;
-
         private String path;
 
-        public MainForm(string path="")
+        public MainForm(string path = "")
         {
-            this.registerContextMenuToolStripMenuItem_Click();
+            registerContextMenuToolStripMenuItem_Click();
             InitializeComponent();
             helper = new Helper();
 
@@ -27,7 +26,7 @@ namespace Compression
                 txtPath.Text = path;
             }
 
-                LockPauseResumeCancel();
+            LockPauseResumeCancel();
             cts = new CancellationTokenSource();
             pauseEvent = new ManualResetEventSlim(true);
         }
@@ -60,7 +59,8 @@ namespace Compression
             }
         }
 
-        private async void ShannonCompress_Click(object sender, EventArgs e) {
+        private async void ShannonCompress_Click(object sender, EventArgs e)
+        {
             if (string.IsNullOrEmpty(txtPath.Text))
             {
                 MessageBox.Show("Please select valid file(s) or folder.");
@@ -212,7 +212,8 @@ namespace Compression
             }
         }
 
-        private async void ShannonDecompress_Click(object sender, EventArgs e) {
+        private async void ShannonDecompress_Click(object sender, EventArgs e)
+        {
             if (string.IsNullOrEmpty(txtPath.Text) || !File.Exists(txtPath.Text))
             {
                 MessageBox.Show("Please select a valid file first.");
@@ -417,8 +418,8 @@ namespace Compression
                 return;
             }
 
+            string password = chkUsePassword.Checked ? txtPassword.Text : null;
             string compressedFilePath = "";
-
             try
             {
                 LockUnlockBtn(false);
@@ -443,7 +444,7 @@ namespace Compression
                         var (data, ext, size) = await helper.Readfile(txtPath.Text);
 
                         // Compress the data
-                        byte[] compressedData = await compressor.CompressFile(data, ext, progress, cts.Token);
+                        byte[] compressedData = await compressor.CompressFile(data, ext, password, progress, cts.Token);
                         long compressedSize = compressedData.Length;
 
                         // Prepare compressed path
@@ -479,14 +480,13 @@ namespace Compression
                             originalSize += new FileInfo(fullPath).Length;
 
                         // Compress and save the data
-                        await compressor.CompressMultipleFiles(files, compressedFilePath, progress, cts.Token);
+                        await compressor.CompressMultipleFiles(files, compressedFilePath, password, progress, cts.Token);
 
                         // Get compressed size
                         long compressedSize = new FileInfo(compressedFilePath).Length;
 
                         // Calculate compression ratio
                         double ratio = helper.CalculateRatio(compressedSize, originalSize);
-
                         this.Invoke(new Action(() =>
                         {
                             lblResults.Text = $"Original: {originalSize} bytes\n" +
@@ -504,9 +504,23 @@ namespace Compression
                         {
                             var files = new List<(string FullPath, string RelativePath)>();
                             string commonPath = helper.GetCommonPath(filePaths);
+
                             long originalSize = 0;
                             foreach (var (fullPath, _) in files)
                                 originalSize += new FileInfo(fullPath).Length;
+
+                            foreach (var filePath in filePaths)
+                            {
+                                string relativePath = filePath.Substring(commonPath.Length).TrimStart(Path.DirectorySeparatorChar);
+                                files.Add((filePath, relativePath));
+                            }
+
+                            // Prepare compressed path
+                            string compressedName = $"{filePaths[0]}-multi-compressed.huff";
+                            compressedFilePath = Path.Combine(Path.GetDirectoryName(commonPath), compressedName);
+
+                            // Compress and save the files
+                            await compressor.CompressMultipleFiles(files, compressedFilePath, password, progress, cts.Token);
 
                             // After compression
                             long compressedSize = new FileInfo(compressedFilePath).Length;
@@ -560,6 +574,18 @@ namespace Compression
                 return;
             }
 
+            string password = null;
+            if (helper.IsPasswordProtected(txtPath.Text))
+            {
+                using (var passwordForm = new PasswordForm())
+                {
+                    if (passwordForm.ShowDialog() != DialogResult.OK)
+                    {
+                        return; // User canceled
+                    }
+                    password = passwordForm.Password;
+                }
+            }
             string decompressedPath = "";
             try
             {
@@ -583,11 +609,42 @@ namespace Compression
                     // Get data
                     var (data, _, size) = await helper.Readfile(txtPath.Text);
 
-                    using (var ms = new MemoryStream(data))
-                    using (var reader = new BinaryReader(ms))
+                    // Try to decrypt if password is provided
+                    if (!string.IsNullOrEmpty(password))
                     {
-                        // Read header
-                        isMultiFile = reader.ReadBoolean();
+                        var decryptedData = helper.DecryptData(data, password);
+
+                        using (var ms = new MemoryStream(decryptedData))
+                        using (var reader = new BinaryReader(ms))
+                        {
+                            // Read header
+                            // Check Password 
+                            bool isPasswordProtected = reader.ReadBoolean();
+                            if (isPasswordProtected && string.IsNullOrEmpty(password))
+                            {
+                                throw new Exception("This file is password protected");
+                            }
+
+                            // Check file or multiFile
+                            isMultiFile = reader.ReadBoolean();
+                        }
+                    }
+                    else
+                    {
+                        using (var ms = new MemoryStream(data))
+                        using (var reader = new BinaryReader(ms))
+                        {
+                            // Read header
+                            // Check Password 
+                            bool isPasswordProtected = reader.ReadBoolean();
+                            if (isPasswordProtected && string.IsNullOrEmpty(password))
+                            {
+                                throw new Exception("This file is password protected");
+                            }
+
+                            // Check file or multiFile
+                            isMultiFile = reader.ReadBoolean();
+                        }
                     }
 
                     if (isMultiFile)
@@ -596,7 +653,7 @@ namespace Compression
                         decompressedPath = txtPath.Text.Replace("-compressed", "-decompressed").Replace(".huff", "");
 
                         // Decompress and save the data
-                        await decompressor.DecompressMultipleFiles(data, decompressedPath, progress, cts.Token);
+                        await decompressor.DecompressMultipleFiles(data, decompressedPath, password, progress, cts.Token);
                         this.Invoke(new Action(() =>
                         {
                             MessageBox.Show($"Folder decompressed successfully!\nSaved as: {decompressedPath}");
@@ -605,7 +662,7 @@ namespace Compression
                     else
                     {
                         // Decompress the data
-                        (byte[] decompressedData, string ext) = await decompressor.DecompressFile(data, progress, cts.Token);
+                        (byte[] decompressedData, string ext) = await decompressor.DecompressFile(data, password, progress, cts.Token);
 
                         // Prepare decompressed path
                         decompressedPath = txtPath.Text.Replace("-compressed", "-decompressed").Replace(".huff", "." + ext);
@@ -637,9 +694,14 @@ namespace Compression
                 else { }
                 MessageBox.Show("Decompression was canceled.");
             }
-            catch (Exception ex)
+            catch (CryptographicException)
             {
-                MessageBox.Show($"Error during decompression: {ex.Message}");
+                MessageBox.Show("Incorrect password or corrupted file!");
+            }
+            catch (Exception ex) when (ex.Message.Contains("password"))
+            {
+                MessageBox.Show("Incorrect password!");
+                return;
             }
             finally
             {
@@ -662,6 +724,18 @@ namespace Compression
                 return;
             }
 
+            string password = null;
+            if (helper.IsPasswordProtected(txtPath.Text)) // You'll need to implement this check
+            {
+                using (var passwordForm = new PasswordForm())
+                {
+                    if (passwordForm.ShowDialog() != DialogResult.OK)
+                    {
+                        return; // User canceled
+                    }
+                    password = passwordForm.Password;
+                }
+            }
             string decompressedPath = "";
             try
             {
@@ -708,7 +782,7 @@ namespace Compression
                     decompressedPath = txtPath.Text.Replace("-compressed", "-decompressed").Replace(".huff", "");
 
                     // Decompress and save the data
-                    await decompressor.DecompressSelectedFiles(data, decompressedPath, selectionForm.SelectedFiles, progress, cts.Token);
+                    await decompressor.DecompressSelectedFiles(data, decompressedPath, selectionForm.SelectedFiles, password, progress, cts.Token);
 
                     this.Invoke(new Action(() =>
                     {
@@ -732,6 +806,15 @@ namespace Compression
                 }
                 else { }
                 MessageBox.Show("Decompression was canceled.");
+            }
+            catch (CryptographicException)
+            {
+                MessageBox.Show("Incorrect password or corrupted file!");
+            }
+            catch (Exception ex) when (ex.Message.Contains("password"))
+            {
+                MessageBox.Show("Incorrect password!");
+                return;
             }
             catch (Exception ex)
             {
@@ -780,6 +863,11 @@ namespace Compression
                 btnCancel.Enabled = false;
                 lblStatus.Text = "Cancelling...";
             }));
+        }
+
+        private void checkBoxPassword(object sender, EventArgs e)
+        {
+            txtPassword.Visible = chkUsePassword.Checked;
         }
 
         private void ResetPauseEvent()
@@ -831,9 +919,9 @@ namespace Compression
             lblStatus.Text = "Ready";
             lblResults.Text = string.Empty;
         }
-    
 
-    private void registerContextMenuToolStripMenuItem_Click()
+
+        private void registerContextMenuToolStripMenuItem_Click()
         {
             try
             {

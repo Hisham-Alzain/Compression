@@ -15,244 +15,263 @@
 
         private void InitializeComponent()
         {
-            txtPath = new TextBox();
-            fileBrowse = new Button();
-            folderBrowse = new Button();
-            ShannonLabel = new Label();
-            ShannonCompress = new Button();
-            ShannonDecompress = new Button();
-            ShannonSelectiveDecompress = new Button();
-            HuffmanLabel = new Label();
-            HuffmanCompress = new Button();
-            HuffmanDecompress = new Button();
-            HuffmanSelectiveDecompress = new Button();
-            btnPause = new Button();
-            btnResume = new Button();
-            btnCancel = new Button();
-            lblResults = new Label();
-            lblStatus = new Label();
-            label1 = new Label();
-            progressBar = new ProgressBar();
-            SuspendLayout();
+            this.txtPath = new System.Windows.Forms.TextBox();
+            this.fileBrowse = new System.Windows.Forms.Button();
+            this.folderBrowse = new System.Windows.Forms.Button();
+            this.ShannonLabel = new System.Windows.Forms.Label();
+            this.ShannonCompress = new System.Windows.Forms.Button();
+            this.ShannonDecompress = new System.Windows.Forms.Button();
+            this.ShannonSelectiveDecompress = new System.Windows.Forms.Button();
+            this.HuffmanLabel = new System.Windows.Forms.Label();
+            this.HuffmanCompress = new System.Windows.Forms.Button();
+            this.HuffmanDecompress = new System.Windows.Forms.Button();
+            this.HuffmanSelectiveDecompress = new System.Windows.Forms.Button();
+            this.btnPause = new System.Windows.Forms.Button();
+            this.btnResume = new System.Windows.Forms.Button();
+            this.btnCancel = new System.Windows.Forms.Button();
+            this.lblResults = new System.Windows.Forms.Label();
+            this.lblStatus = new System.Windows.Forms.Label();
+            this.label1 = new System.Windows.Forms.Label();
+            this.SuspendLayout();
             // 
             // txtPath
             // 
-            txtPath.Location = new Point(26, 93);
-            txtPath.Margin = new Padding(6, 8, 6, 8);
-            txtPath.Name = "txtPath";
-            txtPath.Size = new Size(758, 39);
-            txtPath.TabIndex = 0;
+            this.txtPath.Location = new System.Drawing.Point(16, 58);
+            this.txtPath.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.txtPath.Name = "txtPath";
+            this.txtPath.Size = new System.Drawing.Size(468, 27);
+            this.txtPath.TabIndex = 0;
             // 
             // fileBrowse
             // 
-            fileBrowse.Location = new Point(803, 88);
-            fileBrowse.Margin = new Padding(6, 8, 6, 8);
-            fileBrowse.Name = "fileBrowse";
-            fileBrowse.Size = new Size(228, 56);
-            fileBrowse.TabIndex = 1;
-            fileBrowse.Text = "Browse file...";
-            fileBrowse.UseVisualStyleBackColor = true;
-            fileBrowse.Click += fileBrowse_Click;
+            this.fileBrowse.Location = new System.Drawing.Point(494, 55);
+            this.fileBrowse.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.fileBrowse.Name = "fileBrowse";
+            this.fileBrowse.Size = new System.Drawing.Size(140, 35);
+            this.fileBrowse.TabIndex = 1;
+            this.fileBrowse.Text = "Browse file...";
+            this.fileBrowse.UseVisualStyleBackColor = true;
+            this.fileBrowse.Click += new System.EventHandler(this.fileBrowse_Click);
             // 
             // folderBrowse
             // 
-            folderBrowse.Location = new Point(1046, 88);
-            folderBrowse.Margin = new Padding(6, 8, 6, 8);
-            folderBrowse.Name = "folderBrowse";
-            folderBrowse.Size = new Size(228, 56);
-            folderBrowse.TabIndex = 1;
-            folderBrowse.Text = "Browse folder...";
-            folderBrowse.UseVisualStyleBackColor = true;
-            folderBrowse.Click += folderBrowse_Click;
+            this.folderBrowse.Location = new System.Drawing.Point(644, 55);
+            this.folderBrowse.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.folderBrowse.Name = "folderBrowse";
+            this.folderBrowse.Size = new System.Drawing.Size(140, 35);
+            this.folderBrowse.TabIndex = 1;
+            this.folderBrowse.Text = "Browse folder...";
+            this.folderBrowse.UseVisualStyleBackColor = true;
+            this.folderBrowse.Click += new System.EventHandler(this.folderBrowse_Click);
             // 
             // ShannonLabel
             // 
-            ShannonLabel.AutoSize = true;
-            ShannonLabel.Location = new Point(294, 184);
-            ShannonLabel.Margin = new Padding(6, 0, 6, 0);
-            ShannonLabel.Name = "ShannonLabel";
-            ShannonLabel.Size = new Size(170, 32);
-            ShannonLabel.TabIndex = 5;
-            ShannonLabel.Text = "Shannon-Fano";
+            this.ShannonLabel.AutoSize = true;
+            this.ShannonLabel.Location = new System.Drawing.Point(181, 165);
+            this.ShannonLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.ShannonLabel.Name = "ShannonLabel";
+            this.ShannonLabel.Size = new System.Drawing.Size(80, 23);
+            this.ShannonLabel.TabIndex = 5;
+            this.ShannonLabel.Text = "Shannon-Fano";
             // 
             // ShannonCompress
             // 
-            ShannonCompress.Location = new Point(109, 240);
-            ShannonCompress.Margin = new Padding(6, 8, 6, 8);
-            ShannonCompress.Name = "ShannonCompress";
-            ShannonCompress.Size = new Size(260, 74);
-            ShannonCompress.TabIndex = 2;
-            ShannonCompress.Text = "Compress";
-            ShannonCompress.UseVisualStyleBackColor = true;
-            ShannonCompress.Click += ShannonCompress_Click;
+            this.ShannonCompress.Location = new System.Drawing.Point(67, 200);
+            this.ShannonCompress.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.ShannonCompress.Name = "ShannonCompress";
+            this.ShannonCompress.Size = new System.Drawing.Size(160, 46);
+            this.ShannonCompress.TabIndex = 2;
+            this.ShannonCompress.Text = "Compress";
+            this.ShannonCompress.UseVisualStyleBackColor = true;
+            this.ShannonCompress.Click += new System.EventHandler(this.ShannonCompress_Click);
             // 
             // ShannonDecompress
             // 
-            ShannonDecompress.Location = new Point(382, 240);
-            ShannonDecompress.Margin = new Padding(6, 8, 6, 8);
-            ShannonDecompress.Name = "ShannonDecompress";
-            ShannonDecompress.Size = new Size(260, 74);
-            ShannonDecompress.TabIndex = 3;
-            ShannonDecompress.Text = "Decompress";
-            ShannonDecompress.UseVisualStyleBackColor = true;
-            ShannonDecompress.Click += ShannonDecompress_Click;
+            this.ShannonDecompress.Location = new System.Drawing.Point(235, 200);
+            this.ShannonDecompress.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.ShannonDecompress.Name = "ShannonDecompress";
+            this.ShannonDecompress.Size = new System.Drawing.Size(160, 46);
+            this.ShannonDecompress.TabIndex = 3;
+            this.ShannonDecompress.Text = "Decompress";
+            this.ShannonDecompress.UseVisualStyleBackColor = true;
+            this.ShannonDecompress.Click += new System.EventHandler(this.ShannonDecompress_Click);
             // 
             // ShannonSelectiveDecompress
             // 
-            ShannonSelectiveDecompress.Location = new Point(209, 336);
-            ShannonSelectiveDecompress.Margin = new Padding(6, 8, 6, 8);
-            ShannonSelectiveDecompress.Name = "ShannonSelectiveDecompress";
-            ShannonSelectiveDecompress.Size = new Size(358, 74);
-            ShannonSelectiveDecompress.TabIndex = 3;
-            ShannonSelectiveDecompress.Text = "Selective Decompress";
-            ShannonSelectiveDecompress.UseVisualStyleBackColor = true;
-            ShannonSelectiveDecompress.Click += ShannonSelectiveDecompress_Click;
+            this.ShannonSelectiveDecompress.Location = new System.Drawing.Point(121, 260);
+            this.ShannonSelectiveDecompress.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.ShannonSelectiveDecompress.Name = "ShannonSelectiveDecompress";
+            this.ShannonSelectiveDecompress.Size = new System.Drawing.Size(220, 46);
+            this.ShannonSelectiveDecompress.TabIndex = 3;
+            this.ShannonSelectiveDecompress.Text = "Selective Decompress";
+            this.ShannonSelectiveDecompress.UseVisualStyleBackColor = true;
+            this.ShannonSelectiveDecompress.Click += new System.EventHandler(this.ShannonSelectiveDecompress_Click);
             // 
             // HuffmanLabel
             // 
-            HuffmanLabel.AutoSize = true;
-            HuffmanLabel.Location = new Point(869, 184);
-            HuffmanLabel.Margin = new Padding(6, 0, 6, 0);
-            HuffmanLabel.Name = "HuffmanLabel";
-            HuffmanLabel.Size = new Size(108, 32);
-            HuffmanLabel.TabIndex = 5;
-            HuffmanLabel.Text = "Huffman";
+            this.HuffmanLabel.AutoSize = true;
+            this.HuffmanLabel.Location = new System.Drawing.Point(535, 165);
+            this.HuffmanLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.HuffmanLabel.Name = "HuffmanLabel";
+            this.HuffmanLabel.Size = new System.Drawing.Size(80, 23);
+            this.HuffmanLabel.TabIndex = 5;
+            this.HuffmanLabel.Text = "Huffman";
             // 
             // HuffmanCompress
             // 
-            HuffmanCompress.Location = new Point(658, 240);
-            HuffmanCompress.Margin = new Padding(6, 8, 6, 8);
-            HuffmanCompress.Name = "HuffmanCompress";
-            HuffmanCompress.Size = new Size(260, 74);
-            HuffmanCompress.TabIndex = 2;
-            HuffmanCompress.Text = "Compress";
-            HuffmanCompress.UseVisualStyleBackColor = true;
-            HuffmanCompress.Click += HuffmanCompress_Click;
+            this.HuffmanCompress.Location = new System.Drawing.Point(405, 200);
+            this.HuffmanCompress.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.HuffmanCompress.Name = "HuffmanCompress";
+            this.HuffmanCompress.Size = new System.Drawing.Size(160, 46);
+            this.HuffmanCompress.TabIndex = 2;
+            this.HuffmanCompress.Text = "Compress";
+            this.HuffmanCompress.UseVisualStyleBackColor = true;
+            this.HuffmanCompress.Click += new System.EventHandler(this.HuffmanCompress_Click);
             // 
             // HuffmanDecompress
             // 
-            HuffmanDecompress.Location = new Point(931, 240);
-            HuffmanDecompress.Margin = new Padding(6, 8, 6, 8);
-            HuffmanDecompress.Name = "HuffmanDecompress";
-            HuffmanDecompress.Size = new Size(260, 74);
-            HuffmanDecompress.TabIndex = 3;
-            HuffmanDecompress.Text = "Decompress";
-            HuffmanDecompress.UseVisualStyleBackColor = true;
-            HuffmanDecompress.Click += HuffmanDecompress_Click;
+            this.HuffmanDecompress.Location = new System.Drawing.Point(573, 200);
+            this.HuffmanDecompress.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.HuffmanDecompress.Name = "HuffmanDecompress";
+            this.HuffmanDecompress.Size = new System.Drawing.Size(160, 46);
+            this.HuffmanDecompress.TabIndex = 3;
+            this.HuffmanDecompress.Text = "Decompress";
+            this.HuffmanDecompress.UseVisualStyleBackColor = true;
+            this.HuffmanDecompress.Click += new System.EventHandler(this.HuffmanDecompress_Click);
             // 
             // HuffmanSelectiveDecompress
             // 
-            HuffmanSelectiveDecompress.Location = new Point(746, 336);
-            HuffmanSelectiveDecompress.Margin = new Padding(6, 8, 6, 8);
-            HuffmanSelectiveDecompress.Name = "HuffmanSelectiveDecompress";
-            HuffmanSelectiveDecompress.Size = new Size(358, 74);
-            HuffmanSelectiveDecompress.TabIndex = 3;
-            HuffmanSelectiveDecompress.Text = "Selective Decompress";
-            HuffmanSelectiveDecompress.UseVisualStyleBackColor = true;
-            HuffmanSelectiveDecompress.Click += HuffmanSelectiveDecompress_Click;
+            this.HuffmanSelectiveDecompress.Location = new System.Drawing.Point(459, 260);
+            this.HuffmanSelectiveDecompress.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.HuffmanSelectiveDecompress.Name = "HuffmanSelectiveDecompress";
+            this.HuffmanSelectiveDecompress.Size = new System.Drawing.Size(220, 46);
+            this.HuffmanSelectiveDecompress.TabIndex = 3;
+            this.HuffmanSelectiveDecompress.Text = "Selective Decompress";
+            this.HuffmanSelectiveDecompress.UseVisualStyleBackColor = true;
+            this.HuffmanSelectiveDecompress.Click += new System.EventHandler(this.HuffmanSelectiveDecompress_Click);
             // 
             // btnPause
             // 
-            btnPause.Enabled = false;
-            btnPause.Location = new Point(382, 758);
-            btnPause.Margin = new Padding(6, 8, 6, 8);
-            btnPause.Name = "btnPause";
-            btnPause.Size = new Size(260, 74);
-            btnPause.TabIndex = 8;
-            btnPause.Text = "Pause";
-            btnPause.UseVisualStyleBackColor = true;
-            btnPause.Click += btnPause_Click;
+            this.btnPause.Enabled = false;
+            this.btnPause.Location = new System.Drawing.Point(235, 524);
+            this.btnPause.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.btnPause.Name = "btnPause";
+            this.btnPause.Size = new System.Drawing.Size(160, 46);
+            this.btnPause.TabIndex = 8;
+            this.btnPause.Text = "Pause";
+            this.btnPause.UseVisualStyleBackColor = true;
+            this.btnPause.Click += new System.EventHandler(this.btnPause_Click);
             // 
             // btnResume
             // 
-            btnResume.Enabled = false;
-            btnResume.Location = new Point(658, 758);
-            btnResume.Margin = new Padding(6, 8, 6, 8);
-            btnResume.Name = "btnResume";
-            btnResume.Size = new Size(260, 74);
-            btnResume.TabIndex = 9;
-            btnResume.Text = "Resume";
-            btnResume.UseVisualStyleBackColor = true;
-            btnResume.Click += btnResume_Click;
+            this.btnResume.Enabled = false;
+            this.btnResume.Location = new System.Drawing.Point(405, 524);
+            this.btnResume.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.btnResume.Name = "btnResume";
+            this.btnResume.Size = new System.Drawing.Size(160, 46);
+            this.btnResume.TabIndex = 9;
+            this.btnResume.Text = "Resume";
+            this.btnResume.UseVisualStyleBackColor = true;
+            this.btnResume.Click += new System.EventHandler(this.btnResume_Click);
             // 
             // btnCancel
             // 
-            btnCancel.Enabled = false;
-            btnCancel.Location = new Point(931, 758);
-            btnCancel.Margin = new Padding(6, 8, 6, 8);
-            btnCancel.Name = "btnCancel";
-            btnCancel.Size = new Size(260, 74);
-            btnCancel.TabIndex = 7;
-            btnCancel.Text = "Cancel";
-            btnCancel.UseVisualStyleBackColor = true;
-            btnCancel.Click += btnCancel_Click;
+            this.btnCancel.Enabled = false;
+            this.btnCancel.Location = new System.Drawing.Point(573, 524);
+            this.btnCancel.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.btnCancel.Name = "btnCancel";
+            this.btnCancel.Size = new System.Drawing.Size(160, 46);
+            this.btnCancel.TabIndex = 7;
+            this.btnCancel.Text = "Cancel";
+            this.btnCancel.UseVisualStyleBackColor = true;
+            this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
             // 
             // lblResults
             // 
-            lblResults.BorderStyle = BorderStyle.FixedSingle;
-            lblResults.Location = new Point(26, 451);
-            lblResults.Margin = new Padding(6, 0, 6, 0);
-            lblResults.Name = "lblResults";
-            lblResults.Size = new Size(1239, 194);
-            lblResults.TabIndex = 4;
+            this.lblResults.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.lblResults.Location = new System.Drawing.Point(16, 332);
+            this.lblResults.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.lblResults.Name = "lblResults";
+            this.lblResults.Size = new System.Drawing.Size(763, 122);
+            this.lblResults.TabIndex = 4;
             // 
             // lblStatus
             // 
-            lblStatus.AutoSize = true;
-            lblStatus.Location = new Point(26, 779);
-            lblStatus.Margin = new Padding(6, 0, 6, 0);
-            lblStatus.Name = "lblStatus";
-            lblStatus.Size = new Size(78, 32);
-            lblStatus.TabIndex = 8;
-            lblStatus.Text = "Ready";
+            this.lblStatus.AutoSize = true;
+            this.lblStatus.Location = new System.Drawing.Point(16, 537);
+            this.lblStatus.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.lblStatus.Name = "lblStatus";
+            this.lblStatus.Size = new System.Drawing.Size(209, 31);
+            this.lblStatus.TabIndex = 8;
+            this.lblStatus.Text = "Ready";
             // 
             // label1
             // 
-            label1.AutoSize = true;
-            label1.Location = new Point(26, 54);
-            label1.Margin = new Padding(6, 0, 6, 0);
-            label1.Name = "label1";
-            label1.Size = new Size(111, 32);
-            label1.TabIndex = 5;
-            label1.Text = "File path:";
-            // 
+            this.label1.AutoSize = true;
+            this.label1.Location = new System.Drawing.Point(16, 34);
+            this.label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(69, 20);
+            this.label1.TabIndex = 5;
+            this.label1.Text = "File path:";
+            //
             // progressBar
-            // 
-            progressBar.Location = new Point(26, 672);
-            progressBar.Margin = new Padding(5, 5, 5, 5);
-            progressBar.Name = "progressBar";
-            progressBar.Size = new Size(1240, 48);
-            progressBar.TabIndex = 6;
+            //
+            this.progressBar = new System.Windows.Forms.ProgressBar();
+            this.progressBar.Location = new System.Drawing.Point(16, 470);
+            this.progressBar.Size = new System.Drawing.Size(763, 30);
+            this.progressBar.TabIndex = 6;
+            this.progressBar.Minimum = 0;
+            this.progressBar.Maximum = 100;
+            this.progressBar.Value = 0;
+            //
+            // Password
+            //
+            this.chkUsePassword = new System.Windows.Forms.CheckBox();
+            this.chkUsePassword.Location = new System.Drawing.Point(16, 108);
+            this.chkUsePassword.Size = new System.Drawing.Size(120, 27);
+            this.chkUsePassword.Text = "Use Password";
+            this.chkUsePassword.Visible = true;
+            this.chkUsePassword.CheckedChanged += new System.EventHandler(this.checkBoxPassword);
+            this.txtPassword = new System.Windows.Forms.TextBox();
+            this.txtPassword.Location = new System.Drawing.Point(140, 108);
+            this.txtPassword.Size = new System.Drawing.Size(344, 27);
+            this.txtPassword.PasswordChar = '*';
+            this.txtPassword.Visible = false;
             // 
             // MainForm
             // 
-            AutoScaleDimensions = new SizeF(13F, 32F);
-            AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1300, 960);
-            Controls.Add(progressBar);
-            Controls.Add(label1);
-            Controls.Add(lblStatus);
-            Controls.Add(lblResults);
-            Controls.Add(btnCancel);
-            Controls.Add(btnResume);
-            Controls.Add(btnPause);
-            Controls.Add(ShannonSelectiveDecompress);
-            Controls.Add(ShannonDecompress);
-            Controls.Add(ShannonCompress);
-            Controls.Add(ShannonLabel);
-            Controls.Add(HuffmanSelectiveDecompress);
-            Controls.Add(HuffmanDecompress);
-            Controls.Add(HuffmanCompress);
-            Controls.Add(HuffmanLabel);
-            Controls.Add(folderBrowse);
-            Controls.Add(fileBrowse);
-            Controls.Add(txtPath);
-            Margin = new Padding(6, 8, 6, 8);
-            Name = "MainForm";
-            Text = "File Compressor";
-            Load += MainForm_Load;
-            ResumeLayout(false);
-            PerformLayout();
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.ClientSize = new System.Drawing.Size(800, 600);
+            // Password
+            this.Controls.Add(this.txtPassword);
+            this.Controls.Add(this.chkUsePassword);
+            //
+            this.Controls.Add(this.progressBar);
+            this.Controls.Add(this.label1);
+            this.Controls.Add(this.lblStatus);
+            this.Controls.Add(this.lblResults);
+            this.Controls.Add(this.btnCancel);
+            this.Controls.Add(this.btnResume);
+            this.Controls.Add(this.btnPause);
+            this.Controls.Add(this.ShannonSelectiveDecompress);
+            this.Controls.Add(this.ShannonDecompress);
+            this.Controls.Add(this.ShannonCompress);
+            this.Controls.Add(this.ShannonLabel);
+            this.Controls.Add(this.HuffmanSelectiveDecompress);
+            this.Controls.Add(this.HuffmanDecompress);
+            this.Controls.Add(this.HuffmanCompress);
+            this.Controls.Add(this.HuffmanLabel);
+            this.Controls.Add(this.folderBrowse);
+            this.Controls.Add(this.fileBrowse);
+            this.Controls.Add(this.txtPath);
+            this.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.Name = "MainForm";
+            this.Text = "File Compressor";
+            this.Load += new System.EventHandler(this.MainForm_Load);
+            this.ResumeLayout(false);
+            this.PerformLayout();
 
         }
 
@@ -274,5 +293,8 @@
         private System.Windows.Forms.Label lblStatus;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.ProgressBar progressBar;
+        // Password
+        private System.Windows.Forms.TextBox txtPassword;
+        private System.Windows.Forms.CheckBox chkUsePassword;
     }
 }
