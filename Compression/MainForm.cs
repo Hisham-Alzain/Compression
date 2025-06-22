@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Compression.Compression;
+using System;
 
 namespace Compression
 {
@@ -12,12 +13,21 @@ namespace Compression
         private ManualResetEventSlim pauseEvent;
         private bool isPaused = false;
 
-        public MainForm()
+        private String path;
+
+        public MainForm(string path="")
         {
+            this.registerContextMenuToolStripMenuItem_Click();
             InitializeComponent();
             helper = new Helper();
 
-            LockPauseResumeCancel();
+            if (!string.IsNullOrEmpty(path))
+            {
+                this.path = path;
+                txtPath.Text = path;
+            }
+
+                LockPauseResumeCancel();
             cts = new CancellationTokenSource();
             pauseEvent = new ManualResetEventSlim(true);
         }
@@ -130,9 +140,9 @@ namespace Compression
 
                         this.Invoke(new Action(() =>
                         {
-                          lblResults.Text = $"Original: {originalSize} bytes\n" +
-                          $"Compressed: {compressedSize} bytes\n" +
-                          $"Compression ratio: {ratio:F2}%";
+                            lblResults.Text = $"Original: {originalSize} bytes\n" +
+                            $"Compressed: {compressedSize} bytes\n" +
+                            $"Compression ratio: {ratio:F2}%";
 
                             MessageBox.Show($"Folder compressed successfully!\nSaved as: {compressedFilePath}");
                         }));
@@ -417,7 +427,7 @@ namespace Compression
                 var progress = new Progress<int>(percent =>
                 {
                     progressBar.Value = percent;
-                    lblStatus.Text = isPaused? $"Paused... {percent}%" : $"Compressing... {percent}%";
+                    lblStatus.Text = isPaused ? $"Paused... {percent}%" : $"Compressing... {percent}%";
                 });
                 UnLockPauseCancel();
 
@@ -560,7 +570,7 @@ namespace Compression
                 var progress = new Progress<int>(percent =>
                 {
                     progressBar.Value = percent;
-                    lblStatus.Text = isPaused? $"Paused... {percent}%" : $"Decompressing... {percent}%";
+                    lblStatus.Text = isPaused ? $"Paused... {percent}%" : $"Decompressing... {percent}%";
                 });
                 UnLockPauseCancel();
 
@@ -580,7 +590,7 @@ namespace Compression
                         isMultiFile = reader.ReadBoolean();
                     }
 
-                    if (isMultiFile) 
+                    if (isMultiFile)
                     {
                         // Prepare decompressed path
                         decompressedPath = txtPath.Text.Replace("-compressed", "-decompressed").Replace(".huff", "");
@@ -821,5 +831,40 @@ namespace Compression
             lblStatus.Text = "Ready";
             lblResults.Text = string.Empty;
         }
+    
+
+    private void registerContextMenuToolStripMenuItem_Click()
+        {
+            try
+            {
+                RegistryHelper.RegisterContextMenu();
+                MessageBox.Show("Added to Windows context menu!");
+            }
+            catch (UnauthorizedAccessException)
+            {
+                MessageBox.Show("Admin rights required. Run as administrator.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error: {ex.Message}");
+            }
+        }
+
+        //private void unregisterContextMenuToolStripMenuItem_Click(EventArgs e)
+        //{
+        //    try
+        //    {
+        //        RegistryHelper.UnregisterContextMenu();
+        //        MessageBox.Show("Removed from Windows context menu!");
+        //    }
+        //    catch (UnauthorizedAccessException)
+        //    {
+        //        MessageBox.Show("Admin rights required. Run as administrator.");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        MessageBox.Show($"Error: {ex.Message}");
+        //    }
+        //}
     }
 }
