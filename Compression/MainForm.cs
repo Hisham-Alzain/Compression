@@ -746,7 +746,7 @@ namespace Compression
                 ResetPauseEvent();
                 ResetCancellationToken();
                 Huffman decompressor = new Huffman(pauseEvent);
-                var fileList = await decompressor.GetCompressedFileList(data);
+                var fileList = await decompressor.GetCompressedFileList(data, password);
                 //
 
                 // Show file selection dialog
