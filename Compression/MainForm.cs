@@ -12,7 +12,6 @@ namespace Compression
         // Pause & Resume
         private ManualResetEventSlim pauseEvent;
         private bool isPaused = false;
-        private String path;
 
         public MainForm(string path = "")
         {
@@ -22,7 +21,7 @@ namespace Compression
 
             if (!string.IsNullOrEmpty(path))
             {
-                this.path = path;
+                // Set the file path in your UI
                 txtPath.Text = path;
             }
 

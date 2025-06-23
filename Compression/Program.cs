@@ -5,64 +5,25 @@ namespace Compression
         [STAThread]
         static void Main(string[] args)
         {
-            ApplicationConfiguration.Initialize();
 
-            // Handle command-line operations
-            if (args.Length > 1)
+            try
             {
-                string operation = args[0].ToLower();
-                string path = args[1];
+                ApplicationConfiguration.Initialize();
+                string filePath = null;
 
-                if (operation == "compress")
+                // Check if we have any arguments
+                if (args.Length > 0)
                 {
-                    Application.Run(new MainForm("path"));
+                    // Use the first argument as the file path
+                    filePath = args[0];
                 }
-                else if (operation == "decompress")
-                {
-                    Application.Run(new MainForm("path"));
-                }
+                Application.Run(new MainForm(filePath));
             }
-            else
+            catch (Exception ex)
             {
-                // Normal GUI mode
-                Application.Run(new MainForm());
+                MessageBox.Show($"Startup error: {ex.Message}", "Error",
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
-        //private static void RunHeadlessCompression(string path)
-        //{
-        //    try
-        //    {
-        //        // Simplified compression logic
-        //        // You'll need to adapt your existing compression code here
-        //        MessageBox.Show($"Compression completed for: {path}");
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        MessageBox.Show($"Compression error: {ex.Message}");
-        //    }
-        //    finally
-        //    {
-        //        Application.Exit();
-        //    }
-        //}
-
-        //private static void RunHeadlessDecompression(string path)
-        //{
-        //    try
-        //    {
-        //        // Simplified decompression logic
-        //        // You'll need to adapt your existing decompression code here
-        //        MessageBox.Show($"Decompression completed for: {path}");
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        MessageBox.Show($"Decompression error: {ex.Message}");
-        //    }
-        //    finally
-        //    {
-        //        Application.Exit();
-        //    }
-        //}
     }
 }

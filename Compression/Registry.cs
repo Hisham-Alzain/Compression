@@ -23,9 +23,10 @@ namespace Compression
             if (!IsAdministrator())
                 throw new UnauthorizedAccessException("Admin rights required");
 
-            string appPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            // FIX: Get the actual EXE path
+            string appPath = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
 
-            // For files
+            // For files - pass only the file path
             using (RegistryKey key = Registry.ClassesRoot.CreateSubKey(@"*\shell\Compress with CompressionApp"))
             {
                 key.SetValue("", "Compress with CompressionApp");
@@ -33,11 +34,12 @@ namespace Compression
 
                 using (RegistryKey commandKey = key.CreateSubKey("command"))
                 {
-                    commandKey.SetValue("", $"\"{appPath}\" compress \"%1\"");
+                    // FIX: Pass only the file path without operation verb
+                    commandKey.SetValue("", $"\"{appPath}\" \"%1\"");
                 }
             }
 
-            // For folders
+            // For folders - same as above
             using (RegistryKey key = Registry.ClassesRoot.CreateSubKey(@"Directory\shell\Compress with CompressionApp"))
             {
                 key.SetValue("", "Compress with CompressionApp");
@@ -45,11 +47,11 @@ namespace Compression
 
                 using (RegistryKey commandKey = key.CreateSubKey("command"))
                 {
-                    commandKey.SetValue("", $"\"{appPath}\" compress \"%1\"");
+                    commandKey.SetValue("", $"\"{appPath}\" \"%1\"");
                 }
             }
 
-            // For compressed files (.sf)
+            // For compressed files (.sf) - pass only the file path
             using (RegistryKey key = Registry.ClassesRoot.CreateSubKey(@".sf\shell\Decompress with CompressionApp"))
             {
                 key.SetValue("", "Decompress with CompressionApp");
@@ -57,11 +59,12 @@ namespace Compression
 
                 using (RegistryKey commandKey = key.CreateSubKey("command"))
                 {
-                    commandKey.SetValue("", $"\"{appPath}\" decompress \"%1\"");
+                    // FIX: Pass only the file path
+                    commandKey.SetValue("", $"\"{appPath}\" \"%1\"");
                 }
             }
 
-            // For compressed files (.huff)
+            // For compressed files (.huff) - same as above
             using (RegistryKey key = Registry.ClassesRoot.CreateSubKey(@".huff\shell\Decompress with CompressionApp"))
             {
                 key.SetValue("", "Decompress with CompressionApp");
@@ -69,10 +72,11 @@ namespace Compression
 
                 using (RegistryKey commandKey = key.CreateSubKey("command"))
                 {
-                    commandKey.SetValue("", $"\"{appPath}\" decompress \"%1\"");
+                    commandKey.SetValue("", $"\"{appPath}\" \"%1\"");
                 }
             }
         }
+
 
         //public static void UnregisterContextMenu()
         //{
