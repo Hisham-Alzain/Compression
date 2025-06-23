@@ -67,6 +67,8 @@ namespace Compression
                 return;
             }
 
+            string password = chkUsePassword.Checked ? txtPassword.Text : null;
+
             string compressedFilePath = "";
 
             try
@@ -93,7 +95,7 @@ namespace Compression
                         var (data, ext, size) = await helper.Readfile(txtPath.Text);
 
                         // Compress the data
-                        byte[] compressedData = await compressor.Compress(data, ext, progress, cts.Token);
+                        byte[] compressedData = await compressor.Compress(data, ext, password, progress, cts.Token);
                         long compressedSize = compressedData.Length;
 
                         // Prepare compressed path
@@ -130,7 +132,7 @@ namespace Compression
                             originalSize += new FileInfo(fullPath).Length;
 
                         // Compress and save the data
-                        await compressor.CompressMultipleFiles(files, compressedFilePath, progress, cts.Token);
+                        await compressor.CompressMultipleFiles(files, compressedFilePath, password, progress, cts.Token);
 
                         // Get compressed size
                         long compressedSize = new FileInfo(compressedFilePath).Length;
@@ -167,7 +169,7 @@ namespace Compression
                             compressedFilePath = Path.Combine(Path.GetDirectoryName(commonPath), compressedName);
 
                             // Compress and save the files
-                            await compressor.CompressMultipleFiles(files, compressedFilePath, progress, cts.Token);
+                            await compressor.CompressMultipleFiles(files, compressedFilePath, password, progress, cts.Token);
 
                             // Calculate original size
                             long originalSize = 0;
@@ -226,6 +228,19 @@ namespace Compression
                 return;
             }
 
+            string password = null;
+            if (helper.IsPasswordProtected(txtPath.Text)) // Add this check (same as Huffman)
+            {
+                using (var passwordForm = new PasswordForm())
+                {
+                    if (passwordForm.ShowDialog() != DialogResult.OK)
+                    {
+                        return; // User canceled
+                    }
+                    password = passwordForm.Password;
+                }
+            }
+
             string decompressedPath = "";
             try
             {
@@ -249,11 +264,35 @@ namespace Compression
                     // Get data
                     var (data, _, size) = await helper.Readfile(txtPath.Text);
 
-                    using (var ms = new MemoryStream(data))
-                    using (var reader = new BinaryReader(ms))
+                    // Add password decryption check
+                    if (!string.IsNullOrEmpty(password))
                     {
-                        // Read header
-                        isMultiFile = reader.ReadBoolean();
+                        var decryptedData = helper.DecryptData(data, password);
+                        using (var ms = new MemoryStream(decryptedData))
+                        using (var reader = new BinaryReader(ms))
+                        {
+                            bool isPasswordProtected = reader.ReadBoolean();
+                            if (isPasswordProtected && string.IsNullOrEmpty(password))
+                            {
+                                throw new Exception("This file is password protected");
+                            }
+                            isMultiFile = reader.ReadBoolean();
+                        }
+                    }
+                    else 
+                    { 
+                        using (var ms = new MemoryStream(data))
+                        using (var reader = new BinaryReader(ms))
+                        {
+                            bool isPasswordProtected = reader.ReadBoolean();
+                            if (isPasswordProtected && string.IsNullOrEmpty(password))
+                            {
+                                throw new Exception("This file is password protected");
+                            }
+
+                            // Read header
+                            isMultiFile = reader.ReadBoolean();
+                        }
                     }
 
                     if (isMultiFile)
@@ -262,7 +301,7 @@ namespace Compression
                         decompressedPath = txtPath.Text.Replace("-compressed", "-decompressed").Replace(".sf", "");
 
                         // Decompress and save the data
-                        await decompressor.DecompressMultipleFiles(data, decompressedPath, progress, cts.Token);
+                        await decompressor.DecompressMultipleFiles(data, decompressedPath, password, progress, cts.Token);
                         this.Invoke(new Action(() =>
                         {
                             MessageBox.Show($"Folder decompressed successfully!\nSaved as: {decompressedPath}");
@@ -271,7 +310,7 @@ namespace Compression
                     else
                     {
                         // Decompress the data
-                        (byte[] decompressedData, string ext) = await decompressor.Decompress(data, progress, cts.Token);
+                        (byte[] decompressedData, string ext) = await decompressor.Decompress(data, password, progress, cts.Token);
 
                         // Prepare decompressed path
                         decompressedPath = txtPath.Text.Replace("-compressed", "-decompressed").Replace(".sf", "." + ext);
@@ -303,6 +342,14 @@ namespace Compression
                 else { }
                 MessageBox.Show("Decompression was canceled.");
             }
+            catch (CryptographicException) // Add this catch (same as Huffman)
+            {
+                MessageBox.Show("Incorrect password or corrupted file!");
+            }
+            catch (Exception ex) when (ex.Message.Contains("password")) // Add this catch (same as Huffman)
+            {
+                MessageBox.Show("Incorrect password!");
+            }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error during decompression: {ex.Message}");
@@ -328,6 +375,19 @@ namespace Compression
                 return;
             }
 
+            string password = null;
+            if (helper.IsPasswordProtected(txtPath.Text)) // Add this check (same as Huffman)
+            {
+                using (var passwordForm = new PasswordForm())
+                {
+                    if (passwordForm.ShowDialog() != DialogResult.OK)
+                    {
+                        return; // User canceled
+                    }
+                    password = passwordForm.Password;
+                }
+            }
+
             string decompressedPath = "";
             try
             {
@@ -338,7 +398,7 @@ namespace Compression
                 ResetPauseEvent();
                 ResetCancellationToken();
                 ShannonFano decompressor = new ShannonFano(pauseEvent);
-                var fileList = await decompressor.GetCompressedFileList(data);
+                var fileList = await decompressor.GetCompressedFileList(data, password);
                 //
 
                 // Show file selection dialog
@@ -374,7 +434,7 @@ namespace Compression
                     decompressedPath = txtPath.Text.Replace("-compressed", "-decompressed").Replace(".sf", "");
 
                     // Decompress and save the data
-                    await decompressor.DecompressSelectedFiles(data, decompressedPath, selectionForm.SelectedFiles, progress, cts.Token);
+                    await decompressor.DecompressSelectedFiles(data, decompressedPath, selectionForm.SelectedFiles, password, progress, cts.Token);
 
                     this.Invoke(new Action(() =>
                     {
@@ -398,6 +458,14 @@ namespace Compression
                 }
                 else { }
                 MessageBox.Show("Decompression was canceled.");
+            }
+            catch (CryptographicException) // Add this catch (same as Huffman)
+            {
+                MessageBox.Show("Incorrect password or corrupted file!");
+            }
+            catch (Exception ex) when (ex.Message.Contains("password")) // Add this catch (same as Huffman)
+            {
+                MessageBox.Show("Incorrect password!");
             }
             catch (Exception ex)
             {
