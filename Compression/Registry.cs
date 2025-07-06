@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using Microsoft.Win32;
 using System;
-using System.Text;
-using System.Threading.Tasks;
+using System.Diagnostics;
+using System.Reflection;
 using System.Security.Principal;
-using Microsoft.Win32;
+using System.Windows.Forms;
 
 namespace Compression
 {
@@ -13,91 +11,180 @@ namespace Compression
     {
         public static bool IsAdministrator()
         {
-            var identity = WindowsIdentity.GetCurrent();
-            var principal = new WindowsPrincipal(identity);
-            return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            using (var identity = WindowsIdentity.GetCurrent())
+            {
+                var principal = new WindowsPrincipal(identity);
+                return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
         }
 
-        public static void RegisterContextMenu()
+        public static bool RegisterContextMenu(bool silent = false)
         {
             if (!IsAdministrator())
-                throw new UnauthorizedAccessException("Admin rights required");
-
-            // FIX: Get the actual EXE path
-            string appPath = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
-
-            // For files - pass only the file path
-            using (RegistryKey key = Registry.ClassesRoot.CreateSubKey(@"*\shell\Compress with CompressionApp"))
             {
-                key.SetValue("", "Compress with CompressionApp");
-                key.SetValue("Icon", appPath);
-
-                using (RegistryKey commandKey = key.CreateSubKey("command"))
+                if (!silent)
                 {
-                    // FIX: Pass only the file path without operation verb
-                    commandKey.SetValue("", $"\"{appPath}\" \"%1\"");
+                    var result = MessageBox.Show("This operation requires administrator privileges. Do you want to elevate now?",
+                        "Admin Rights Required", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                    if (result != DialogResult.Yes)
+                        return false;
+                }
+
+                try
+                {
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = Assembly.GetEntryAssembly().Location,
+                        Arguments = "--register",
+                        Verb = "runas",
+                        UseShellExecute = true
+                    };
+
+                    var process = Process.Start(startInfo);
+                    process.WaitForExit();
+                    return process.ExitCode == 0;
+                }
+                catch (Exception ex)
+                {
+                    if (!silent)
+                        MessageBox.Show($"Failed to elevate: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return false;
                 }
             }
 
-            // For folders - same as above
-            using (RegistryKey key = Registry.ClassesRoot.CreateSubKey(@"Directory\shell\Compress with CompressionApp"))
-            {
-                key.SetValue("", "Compress with CompressionApp");
-                key.SetValue("Icon", appPath);
+            string appPath = Process.GetCurrentProcess().MainModule.FileName;
 
-                using (RegistryKey commandKey = key.CreateSubKey("command"))
+            try
+            {
+                // Register for all file types
+                using (var key = Registry.ClassesRoot.CreateSubKey(@"*\shell\CompressionApp"))
                 {
-                    commandKey.SetValue("", $"\"{appPath}\" \"%1\"");
+                    key.SetValue("MUIVerb", "Compression Options");
+                    key.SetValue("SubCommands", "");
+
+                    using (var shellKey = key.CreateSubKey("shell"))
+                    {
+                        AddCompressionCommands(shellKey, appPath);
+                    }
                 }
-            }
 
-            // For compressed files (.sf) - pass only the file path
-            using (RegistryKey key = Registry.ClassesRoot.CreateSubKey(@".sf\shell\Decompress with CompressionApp"))
-            {
-                key.SetValue("", "Decompress with CompressionApp");
-                key.SetValue("Icon", appPath);
-
-                using (RegistryKey commandKey = key.CreateSubKey("command"))
+                // Register for directories
+                using (var key = Registry.ClassesRoot.CreateSubKey(@"Directory\shell\CompressionApp"))
                 {
-                    // FIX: Pass only the file path
-                    commandKey.SetValue("", $"\"{appPath}\" \"%1\"");
+                    key.SetValue("MUIVerb", "Compression Options");
+                    key.SetValue("SubCommands", "");
+
+                    using (var shellKey = key.CreateSubKey("shell"))
+                    {
+                        AddCompressionCommands(shellKey, appPath);
+                    }
                 }
+
+                return true;
             }
-
-            // For compressed files (.huff) - same as above
-            using (RegistryKey key = Registry.ClassesRoot.CreateSubKey(@".huff\shell\Decompress with CompressionApp"))
+            catch (Exception ex)
             {
-                key.SetValue("", "Decompress with CompressionApp");
-                key.SetValue("Icon", appPath);
+                if (!silent)
+                    MessageBox.Show($"Registration failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+        }
 
-                using (RegistryKey commandKey = key.CreateSubKey("command"))
+        private static void AddCompressionCommands(RegistryKey shellKey, string appPath)
+        {
+            // Compress commands
+            AddCommand(shellKey, "shannon_compress", "Compress with Shannon", appPath, "shannon_compress");
+            AddCommand(shellKey, "huffman_compress", "Compress with Huffman", appPath, "huffman_compress");
+
+            // Decompress commands
+            AddCommand(shellKey, "shannon_decompress", "Decompress with Shannon", appPath, "shannon_decompress");
+            AddCommand(shellKey, "huffman_decompress", "Decompress with Huffman", appPath, "huffman_decompress");
+        }
+
+        private static void AddCommand(RegistryKey parent, string name, string label, string appPath, string command)
+        {
+            using (var key = parent.CreateSubKey(name))
+            {
+                key.SetValue("", label);
+                using (var cmdKey = key.CreateSubKey("command"))
                 {
-                    commandKey.SetValue("", $"\"{appPath}\" \"%1\"");
+                    cmdKey.SetValue("", $"\"{appPath}\" \"{command}\" \"%1\"");
                 }
             }
         }
 
+        public static bool UnregisterContextMenu(bool silent = false)
+        {
+            if (!IsAdministrator())
+            {
+                if (!silent)
+                {
+                    var result = MessageBox.Show("This operation requires administrator privileges. Do you want to elevate now?",
+                        "Admin Rights Required", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
-        //public static void UnregisterContextMenu()
-        //{
-        //    if (!IsAdministrator())
-        //        throw new UnauthorizedAccessException("Admin rights required");
+                    if (result != DialogResult.Yes)
+                        return false;
+                }
 
-        //    string[] keysToDelete = {
-        //    @"*\shell\Compress with CompressionApp",
-        //    @"Directory\shell\Compress with CompressionApp",
-        //    @".sf\shell\Decompress with CompressionApp",
-        //    @".huff\shell\Decompress with CompressionApp"
-        //};
+                try
+                {
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = Assembly.GetEntryAssembly().Location,
+                        Arguments = "--unregister",
+                        Verb = "runas",
+                        UseShellExecute = true
+                    };
 
-        //    foreach (var key in keysToDelete)
-        //    {
-        //        try
-        //        {
-        //            Registry.ClassesRoot.DeleteSubKeyTree(key, false);
-        //        }
-        //        catch { /* Ignore missing keys */ }
-        //    }
-        //}
+                    var process = Process.Start(startInfo);
+                    process.WaitForExit();
+                    return process.ExitCode == 0;
+                }
+                catch (Exception ex)
+                {
+                    if (!silent)
+                        MessageBox.Show($"Failed to elevate: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return false;
+                }
+            }
+
+            try
+            {
+                string[] keysToDelete = {
+                    @"*\shell\CompressionApp",
+                    @"Directory\shell\CompressionApp",
+                    @".sf",
+                    @".huff",
+                    @".sf_auto_file",
+                    @".huff_auto_file",
+                    @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\CompressionApp"
+                };
+
+                foreach (var key in keysToDelete)
+                {
+                    try
+                    {
+                        if (key.StartsWith(@"SOFTWARE\"))
+                        {
+                            Registry.LocalMachine.DeleteSubKeyTree(key, false);
+                        }
+                        else
+                        {
+                            Registry.ClassesRoot.DeleteSubKeyTree(key, false);
+                        }
+                    }
+                    catch { /* Ignore missing keys */ }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (!silent)
+                    MessageBox.Show($"Unregistration failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+        }
     }
 }

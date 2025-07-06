@@ -313,7 +313,7 @@ namespace Compression
                         Interlocked.Increment(ref processedFiles);
                         progress?.Report((int)((double)processedFiles / fileCount * 100));
                         //await Task.Delay(1, cancellationToken); // Let UI process
-                    //});
+                        //});
                     }
                 }
             }
@@ -528,6 +528,234 @@ namespace Compression
 
             GenerateCodes(node.Left, code + "0", codes);
             GenerateCodes(node.Right, code + "1", codes);
+        }
+
+        public async Task menuCompress(String path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                MessageBox.Show("Please select valid file(s) or folder.");
+                return;
+            }
+
+            string compressedFilePath = "";
+            try
+            {
+                if (File.Exists(path))
+                {
+                    // Get data
+                    var (data, ext, size) = await helper.Readfile(path);
+
+                    // Compress the data
+                    byte[] compressedData = await CompressFile(data, ext, null, null);
+                    long compressedSize = compressedData.Length;
+
+                    // Prepare compressed path
+                    string fileName = Path.GetFileName(path);
+                    string filePath = path.Replace(fileName, "");
+                    string compressedName = fileName.Replace("." + ext, "");
+                    compressedFilePath = filePath + compressedName + "-compressed.huff";
+
+                    // Save compressed file
+                    await File.WriteAllBytesAsync(compressedFilePath, compressedData);
+
+                    // Calculate and display compression ratio
+                    double ratio = helper.CalculateRatio(compressedSize, size);
+                }
+                else if (Directory.Exists(path))
+                {
+                    // Get data
+                    var (files, distPath, dirName) = helper.ReadDirectory(path);
+
+                    // Prepare compressed path
+                    compressedFilePath = Path.Combine(distPath, dirName + "-compressed.huff");
+                    // Compute original total size
+                    long originalSize = 0;
+                    foreach (var (fullPath, _) in files)
+                        originalSize += new FileInfo(fullPath).Length;
+
+                    // Compress and save the data
+                    await CompressMultipleFiles(files, compressedFilePath, null, null);
+
+                    // Get compressed size
+                    long compressedSize = new FileInfo(compressedFilePath).Length;
+
+                    // Calculate compression ratio
+                    double ratio = helper.CalculateRatio(compressedSize, originalSize);
+                }
+                else
+                {
+                    // Handle multiple file selection
+                    var filePaths = path.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (filePaths.Length > 1)
+                    {
+                        var files = new List<(string FullPath, string RelativePath)>();
+                        string commonPath = helper.GetCommonPath(filePaths);
+
+                        long originalSize = 0;
+                        foreach (var (fullPath, _) in files)
+                            originalSize += new FileInfo(fullPath).Length;
+
+                        foreach (var filePath in filePaths)
+                        {
+                            string relativePath = filePath.Substring(commonPath.Length).TrimStart(Path.DirectorySeparatorChar);
+                            files.Add((filePath, relativePath));
+                        }
+
+                        // Prepare compressed path
+                        string compressedName = $"{filePaths[0]}-multi-compressed.huff";
+                        compressedFilePath = Path.Combine(Path.GetDirectoryName(commonPath), compressedName);
+
+                        // Compress and save the files
+                        await CompressMultipleFiles(files, compressedFilePath, null, null);
+
+                        // After compression
+                        long compressedSize = new FileInfo(compressedFilePath).Length;
+                        double ratio = helper.CalculateRatio(compressedSize, originalSize);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Clean up partial output file if it exists
+                if (File.Exists(compressedFilePath))
+                {
+                    try { File.Delete(compressedFilePath); }
+                    catch { /* Ignore deletion errors */ }
+                }
+                MessageBox.Show("Compression was canceled.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error during compression: {ex.Message}");
+            }
+            finally
+            {
+                await Task.Delay(100);
+            }
+        }
+
+        public async Task menuDecompress(String path)
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            {
+                MessageBox.Show("Please select a valid file first.");
+                return;
+            }
+
+            if (!path.EndsWith(".huff"))
+            {
+                MessageBox.Show("Please select a .huff compressed file.");
+                return;
+            }
+
+            string password = null;
+            if (helper.IsPasswordProtected(path))
+            {
+                using (var passwordForm = new PasswordForm())
+                {
+                    if (passwordForm.ShowDialog() != DialogResult.OK)
+                    {
+                        return; // User canceled
+                    }
+                    password = passwordForm.Password;
+                }
+            }
+            string decompressedPath = "";
+            try
+            {
+                bool isMultiFile;
+
+                // Get data
+                var (data, _, size) = await helper.Readfile(path);
+
+                // Try to decrypt if password is provided
+                if (!string.IsNullOrEmpty(password))
+                {
+                    var decryptedData = helper.DecryptData(data, password);
+
+                    using (var ms = new MemoryStream(decryptedData))
+                    using (var reader = new BinaryReader(ms))
+                    {
+                        // Read header
+                        // Check Password 
+                        bool isPasswordProtected = reader.ReadBoolean();
+                        if (isPasswordProtected && string.IsNullOrEmpty(password))
+                        {
+                            throw new Exception("This file is password protected");
+                        }
+
+                        // Check file or multiFile
+                        isMultiFile = reader.ReadBoolean();
+                    }
+                }
+                else
+                {
+                    using (var ms = new MemoryStream(data))
+                    using (var reader = new BinaryReader(ms))
+                    {
+                        // Read header
+                        // Check Password 
+                        bool isPasswordProtected = reader.ReadBoolean();
+                        if (isPasswordProtected && string.IsNullOrEmpty(password))
+                        {
+                            throw new Exception("This file is password protected");
+                        }
+
+                        // Check file or multiFile
+                        isMultiFile = reader.ReadBoolean();
+                    }
+                }
+
+                if (isMultiFile)
+                {
+                    // Prepare decompressed path
+                    decompressedPath = path.Replace("-compressed", "-decompressed").Replace(".huff", "");
+
+                    // Decompress and save the data
+                    await DecompressMultipleFiles(data, decompressedPath, password, null);
+                }
+                else
+                {
+                    // Decompress the data
+                    (byte[] decompressedData, string ext) = await DecompressFile(data, password, null);
+
+                    // Prepare decompressed path
+                    decompressedPath = path.Replace("-compressed", "-decompressed").Replace(".huff", "." + ext);
+
+                    // Save decompressed file
+                    await File.WriteAllBytesAsync(decompressedPath, decompressedData);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Clean up partial output file if it exists
+                if (File.Exists(decompressedPath))
+                {
+                    try { File.Delete(decompressedPath); }
+                    catch { /* Ignore deletion errors */ }
+                }
+                else if (Directory.Exists(decompressedPath))
+                {
+                    try { Directory.Delete(decompressedPath, true); }
+                    catch { /* Ignore deletion errors */ }
+                }
+                else { }
+                MessageBox.Show("Decompression was canceled.");
+            }
+            catch (CryptographicException)
+            {
+                MessageBox.Show("Incorrect password or corrupted file!");
+            }
+            catch (Exception ex) when (ex.Message.Contains("password"))
+            {
+                MessageBox.Show("Incorrect password!");
+                return;
+            }
+            finally
+            {
+                await Task.Delay(100);
+            }
         }
     }
 
