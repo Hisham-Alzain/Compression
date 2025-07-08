@@ -5,8 +5,14 @@ namespace Compression
 {
     internal static class Program
     {
-        [STAThread]
-        static async Task Main(string[] args)
+        [STAThread] // This can be kept if you use the solution below
+        static void Main(string[] args)
+        {
+            // Wrap the async code in a synchronous context
+            MainAsync(args).GetAwaiter().GetResult();
+        }
+
+        static async Task MainAsync(string[] args)
         {
             try
             {
@@ -44,34 +50,35 @@ namespace Compression
                     string filePath = args.Length > 1 ? args[1] : null;
                     var cts = new CancellationTokenSource();
                     var pauseEvent = new ManualResetEventSlim(true);
-
-                    switch (operation)
+                    await Task.Run(async () =>
                     {
-                        case "huffman_compress":
-                            Huffman compressor1 = new Huffman(pauseEvent);
-                            await compressor1.menuCompress(filePath);
-                            break;
+                        switch (operation)
+                        {
+                            case "huffman_compress":
+                                Huffman compressor1 = new Huffman(pauseEvent);
+                                await compressor1.menuCompress(filePath);
+                                break;
 
-                        case "huffman_decompress":
-                            Huffman decompressor1 = new Huffman(pauseEvent);
-                            await decompressor1.menuDecompress(filePath);
-                            break;
+                            case "huffman_decompress":
+                                Huffman decompressor1 = new Huffman(pauseEvent);
+                                await decompressor1.menuDecompress(filePath);
+                                break;
 
-                        case "shannon_compress":
-                            ShannonFano compressor2 = new ShannonFano(pauseEvent);
-                            await compressor2.menuCompress(filePath);
-                            break;
+                            case "shannon_compress":
+                                ShannonFano compressor2 = new ShannonFano(pauseEvent);
+                                await compressor2.menuCompress(filePath);
+                                break;
 
-                        case "shannon_decompress":
-                            ShannonFano decompressor2 = new ShannonFano(pauseEvent);
-                            await decompressor2.menuDecompress(filePath);
-                            break;
+                            case "shannon_decompress":
+                                ShannonFano decompressor2 = new ShannonFano(pauseEvent);
+                                await decompressor2.menuDecompress(filePath);
+                                break;
 
-                        default:
-                            MessageBox.Show("Unknown operation.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            break;
-                    }
-
+                            default:
+                                MessageBox.Show("Unknown operation.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                break;
+                        }
+                    });
                     return;
                 }
 
