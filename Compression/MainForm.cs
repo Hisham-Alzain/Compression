@@ -15,7 +15,6 @@ namespace Compression
 
         public MainForm(string path = "")
         {
-            registerContextMenuToolStripMenuItem_Click();
             InitializeComponent();
             helper = new Helper();
 
@@ -987,39 +986,5 @@ namespace Compression
             lblResults.Text = string.Empty;
         }
 
-
-        private void registerContextMenuToolStripMenuItem_Click()
-        {
-            try
-            {
-                RegistryHelper.RegisterContextMenu();
-                MessageBox.Show("Added to Windows context menu!");
-            }
-            catch (UnauthorizedAccessException)
-            {
-                MessageBox.Show("Admin rights required. Run as administrator.");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error: {ex.Message}");
-            }
-        }
-
-        //private void unregisterContextMenuToolStripMenuItem_Click(EventArgs e)
-        //{
-        //    try
-        //    {
-        //        RegistryHelper.UnregisterContextMenu();
-        //        MessageBox.Show("Removed from Windows context menu!");
-        //    }
-        //    catch (UnauthorizedAccessException)
-        //    {
-        //        MessageBox.Show("Admin rights required. Run as administrator.");
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        MessageBox.Show($"Error: {ex.Message}");
-        //    }
-        //}
     }
 }
